@@ -1,0 +1,83 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "logfirst"
+version = "0.1.0"
+description = "Log-first, post-quantum, recipient-attributable document distribution"
+requires-python = ">=3.11"
+dependencies = [
+    # The single most important dependency, and the only one that is not pure
+    # Python: everything in logfirst/crypto/ goes through liboqs. It is a core
+    # dependency rather than an extra because there is no degraded mode -- the
+    # system cannot sign a request or issue a key without it, and a manifest
+    # that let you install a version that starts and then fails to verify
+    # would be worse than one that refuses to install.
+    #
+    # The *binding* is on PyPI; the native liboqs.so is not, so this being
+    # satisfied does not mean the system works. scripts/check_env.py is what
+    # establishes that, and it does it by using each algorithm.
+    "liboqs-python>=0.10",
+    "cryptography>=42",
+    "numpy>=1.26",
+    "pillow>=10",
+    "reedsolo>=1.7",
+    # The authority renders the document to PDF at seal time, so this is a core
+    # dependency and not an extra: there is no mode in which a document is
+    # sealed without an artefact, and a guarded fallback would produce an
+    # envelope with a PDF section that is empty -- worse than refusing to start.
+    "fpdf2>=2.8,<3",
+]
+
+[project.optional-dependencies]
+# The authority service, the witness nodes and the client nodes all speak HTTP.
+# `httpx` is a runtime dependency here rather than a test-only one: the client
+# node and the witness client both use it to reach the authority, so a client
+# that cannot make a request is not a client.
+service = [
+    "fastapi>=0.115",
+    "uvicorn>=0.32",
+    "httpx>=0.27",
+]
+# Document identification in the leak-check pipeline is TF-IDF cosine over word
+# n-grams. Deliberately not a transformer: at hackathon corpus scale TF-IDF is
+# both sufficient and auditable, which matters more here than the last few
+# points of recall.
+forensics = [
+    "scikit-learn>=1.4",
+]
+# OCR is invoked as the system `tesseract` binary through pytesseract. The
+# binary is a system package, not a pip one; `make bootstrap` checks for it.
+ocr = [
+    "pytesseract>=0.3.10",
+]
+# Rendering an anchor as a QR block, so a root can be photographed off a screen
+# into a meeting minute. Genuinely optional and guarded: without it the anchor is
+# still written to anchors.jsonl and still printed as a short transcribable code,
+# which is the fallback the ledger is designed around.
+qr = [
+    "qrcode>=7.4",
+]
+dev = [
+    "pytest>=8",
+    # The suite stands up real witness processes and real sockets; a hung test
+    # is a blocked port or a witness that never answered, not a slow machine.
+    # Without this plugin the `timeout` option below is silently ignored.
+    "pytest-timeout>=2.3",
+]
+
+[tool.setuptools.packages.find]
+# `verifier` is included so the service can run it over bytes it just produced.
+# It does not entangle the verifier with anything: the verifier still imports
+# only the standard library and liboqs, and tests/test_verifier_independence.py
+# asserts that, both by scanning its imports statically and by verifying a real
+# bundle in a subprocess where importing the package raises.
+include = ["logfirst*", "verifier*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+# A hung test here usually means a blocked socket or a witness that never
+# answered; fail loudly rather than hanging forever.
+timeout = 300

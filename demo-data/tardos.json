@@ -1,0 +1,11 @@
+{
+ "colluders": 2,
+ "eps": 0.001,
+ "seed": 18367383038938798601,
+ "users": [
+  "alice",
+  "bob",
+  "carol",
+  "dave"
+ ]
+}

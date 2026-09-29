@@ -1,0 +1,23 @@
+Metadata-Version: 2.4
+Name: logfirst
+Version: 0.1.0
+Summary: Log-first, post-quantum, recipient-attributable document distribution
+Requires-Python: >=3.11
+Requires-Dist: liboqs-python>=0.10
+Requires-Dist: cryptography>=42
+Requires-Dist: numpy>=1.26
+Requires-Dist: pillow>=10
+Requires-Dist: reedsolo>=1.7
+Provides-Extra: service
+Requires-Dist: fastapi>=0.115; extra == "service"
+Requires-Dist: uvicorn>=0.32; extra == "service"
+Requires-Dist: httpx>=0.27; extra == "service"
+Provides-Extra: forensics
+Requires-Dist: scikit-learn>=1.4; extra == "forensics"
+Provides-Extra: ocr
+Requires-Dist: pytesseract>=0.3.10; extra == "ocr"
+Provides-Extra: qr
+Requires-Dist: qrcode>=7.4; extra == "qr"
+Provides-Extra: dev
+Requires-Dist: pytest>=8; extra == "dev"
+Requires-Dist: pytest-timeout>=2.3; extra == "dev"

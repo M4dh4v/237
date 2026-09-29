@@ -1,0 +1,30 @@
+# Pinned for the demo environment. `make bootstrap` installs these.
+#
+# liboqs-python is the Python binding; it needs the native `liboqs` shared
+# library present at run time. If `import oqs` fails, that is almost always the
+# missing .so rather than the missing binding -- see README "Installing liboqs".
+#
+# This is the flat list for a quick `pip install -r`; pyproject.toml carries the
+# same dependencies split into groups (service / forensics / ocr / dev) so a
+# deployment can install only what it runs. Keep the two in step.
+#
+# Anything not imported anywhere in the tree has been dropped rather than left
+# in "just in case": `scripts/check_env.py` reports what is missing and what
+# each absence costs, so the manifest does not need to speculate.
+liboqs-python>=0.10
+cryptography>=42
+numpy>=1.26
+pillow>=10
+reedsolo>=1.7
+# The seal path renders the document to PDF, so this is required rather than an
+# extra: without it the authority cannot seal anything, and a guarded fallback
+# would ship a text-only envelope behind a download button that goes nowhere.
+fpdf2>=2.8,<3
+qrcode>=7.4
+fastapi>=0.115
+uvicorn[standard]>=0.32
+httpx>=0.27
+scikit-learn>=1.4
+pytesseract>=0.3.10
+pytest>=8
+pytest-timeout>=2.3

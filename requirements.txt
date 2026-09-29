@@ -22,6 +22,13 @@ reedsolo>=1.7
 fpdf2>=2.8,<3
 qrcode>=7.4
 fastapi>=0.115
+# Demo-glue upload adapters (POST /demo/source/upload, /leakcheck/upload) accept
+# multipart/form-data; FastAPI needs this to parse it, and TestClient needs it to
+# post it. Pure Python.
+python-multipart>=0.0.9
+# Extracts a PDF's text layer for the upload adapters. Pure Python, no native
+# dependency; scanned/image-only PDFs still fall back to the existing OCR path.
+pypdf>=4,<6
 uvicorn[standard]>=0.32
 httpx>=0.27
 scikit-learn>=1.4

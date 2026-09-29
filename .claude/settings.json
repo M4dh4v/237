@@ -1,0 +1,47 @@
+{
+  "env": {
+    "ANTHROPIC_AUTH_TOKEN": "sk-6UUeUTZOWbG9Q8Yah7ESeVWbpQPzuTGVuuKgHPAastBRe3bQ",
+    "ANTHROPIC_BASE_URL": "https://api.justwoker.icu",
+    "ANTHROPIC_MODEL": "claude-opus-4-8",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
+  },
+  "permissions": {
+    "allow": [],
+    "deny": []
+  },
+  "model": "opus[1m]",
+  "statusLine": {
+    "type": "command",
+    "command": "bash \"/home/dead/.claude/plugins/cache/caveman/caveman/0d95a81d35a9/src/hooks/caveman-statusline.sh\""
+  },
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true,
+    "superpowers@superpowers-marketplace": true,
+    "caveman@caveman": true,
+    "ponytail@ponytail": true
+  },
+  "extraKnownMarketplaces": {
+    "superpowers-marketplace": {
+      "source": {
+        "source": "github",
+        "repo": "obra/superpowers-marketplace"
+      }
+    },
+    "ponytail": {
+      "source": {
+        "source": "github",
+        "repo": "DietrichGebert/ponytail"
+      }
+    },
+    "caveman": {
+      "source": {
+        "source": "github",
+        "repo": "juliusbrussee/caveman"
+      }
+    }
+  },
+  "effortLevel": "high",
+  "skipDangerousModePermissionPrompt": true,
+  "skipWorkflowUsageWarning": true,
+  "theme": "auto"
+}

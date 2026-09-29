@@ -3,20 +3,19 @@ import {
   BrowserRouter,
   Routes,
   Route,
-  Link,
   useNavigate,
 } from 'react-router-dom'
 
 import { ShellProvider, useRole, useLite } from './shell/context.jsx'
 import { StatusStrip, SceneFallback } from './components/index.js'
-import Dvarapala from './dashboards/Dvarapala.jsx'
-import Suchi from './dashboards/Suchi.jsx'
-import Anvesana from './dashboards/Anvesana.jsx'
 
-// Scenes are code-split and lazy-mounted per route (sakshya-3d: the landing's
-// scene must never run while a dashboard is mounted). The boundaries are wired
-// now so Lane A drops real R3F in without touching the shell.
-const GateScene = lazy(() => import('./scenes/GateScene.jsx'))
+// Scenes AND dashboards are code-split and lazy-mounted per route (sakshya-3d:
+// the landing must never carry a dashboard's weight, and one broken dashboard
+// must not white-screen the whole app — its failure stays on its own route).
+const Dvarapala = lazy(() => import('./dashboards/Dvarapala.jsx'))
+const Suchi = lazy(() => import('./dashboards/Suchi.jsx'))
+const Anvesana = lazy(() => import('./dashboards/Anvesana.jsx'))
+const Pravaha = lazy(() => import('./scenes/Pravaha.jsx'))
 const WitnessRingScene = lazy(() => import('./scenes/WitnessRingScene.jsx'))
 // Dev-only design gallery (not linked in product nav).
 const Gallery = lazy(() => import('./design-system/Gallery.jsx'))
@@ -26,14 +25,23 @@ export default function App() {
     <ShellProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Landing />} />
+          <Route
+            path="/"
+            element={
+              <Suspense fallback={null}>
+                <Pravaha />
+              </Suspense>
+            }
+          />
           <Route path="/darsana" element={<Darsana />} />
           <Route
             path="/dvarapala"
             element={
               <Authed>
                 <div className="stage">
-                  <Dvarapala />
+                  <Suspense fallback={<SceneFallback name="Dvārapāla" />}>
+                    <Dvarapala />
+                  </Suspense>
                 </div>
               </Authed>
             }
@@ -43,7 +51,9 @@ export default function App() {
             element={
               <Authed>
                 <div className="stage">
-                  <Suchi />
+                  <Suspense fallback={<SceneFallback name="Sūchī" />}>
+                    <Suchi />
+                  </Suspense>
                 </div>
               </Authed>
             }
@@ -53,7 +63,9 @@ export default function App() {
             element={
               <Authed>
                 <div className="stage">
-                  <Anvesana />
+                  <Suspense fallback={<SceneFallback name="Anveṣaṇa" />}>
+                    <Anvesana />
+                  </Suspense>
                 </div>
               </Authed>
             }
@@ -74,7 +86,14 @@ export default function App() {
               </Suspense>
             }
           />
-          <Route path="*" element={<Landing />} />
+          <Route
+            path="*"
+            element={
+              <Suspense fallback={null}>
+                <Pravaha />
+              </Suspense>
+            }
+          />
         </Routes>
       </BrowserRouter>
     </ShellProvider>
@@ -103,59 +122,6 @@ function Authed({ children }) {
         />
       </div>
       <div className="shell__body">{children}</div>
-    </div>
-  )
-}
-
-/**
- * Pravāha — the landing (design plan §6). PLACEHOLDER: Lane A builds the
- * scroll journey. Kept truthful and calm; a lazy scene is mounted behind a
- * Suspense boundary so the code-split wiring is real from day one.
- */
-function Landing() {
-  return (
-    <div className="shell">
-      <div
-        className="stage"
-        style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 'calc(var(--gap) * 2)' }}
-      >
-        <div>
-          <p style={{ fontFamily: 'var(--font-mono)', color: 'var(--struct-2)', fontSize: 13, letterSpacing: '0.1em', margin: 0 }}>
-            SIH26237 · WESEE · offline forensic-attribution instrument
-          </p>
-          <h1 style={{ fontSize: 'clamp(40px, 8vw, 88px)', letterSpacing: '-0.02em', margin: '8px 0 0' }}>
-            SĀKṢYA
-          </h1>
-          <p style={{ maxWidth: 560, color: 'var(--ink-muted)', fontSize: 18, lineHeight: 1.5 }}>
-            Every copy reads as an ordinary copy, yet quietly carries a different
-            hidden fingerprint — and the record of who opened what is held by many
-            witnesses, so no single admin can rewrite it.
-          </p>
-        </div>
-
-        <Suspense fallback={<SceneFallback name="Pravāha — the flow" />}>
-          <GateScene />
-        </Suspense>
-
-        <div style={{ display: 'flex', gap: 'var(--gap)', alignItems: 'center' }}>
-          <Link
-            to="/darsana"
-            style={{
-              padding: '10px 18px',
-              borderRadius: 'var(--radius)',
-              border: '1px solid var(--accent-soft)',
-              color: 'var(--accent)',
-              fontFamily: 'var(--font-display)',
-              fontWeight: 500,
-            }}
-          >
-            Enter →
-          </Link>
-          <Link to="/darsana" style={{ color: 'var(--ink-faint)', fontSize: 13 }}>
-            skip to app
-          </Link>
-        </div>
-      </div>
     </div>
   )
 }

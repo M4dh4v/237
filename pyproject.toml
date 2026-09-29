@@ -39,6 +39,12 @@ service = [
     "fastapi>=0.115",
     "uvicorn>=0.32",
     "httpx>=0.27",
+    # The demo-glue upload adapters accept multipart/form-data; FastAPI needs
+    # this to parse it. Pure Python.
+    "python-multipart>=0.0.9",
+    # Text-layer extraction for uploaded PDFs in the source/leak-check adapters.
+    # Pure Python; scanned PDFs fall back to the existing OCR path.
+    "pypdf>=4,<6",
 ]
 # Document identification in the leak-check pipeline is TF-IDF cosine over word
 # n-grams. Deliberately not a transformer: at hackathon corpus scale TF-IDF is

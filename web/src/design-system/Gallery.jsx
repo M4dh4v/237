@@ -12,6 +12,8 @@ import {
   ClassificationBanner,
   SceneFallback,
 } from '@/components/index.js'
+import WitnessRing from '@/components/WitnessRing.jsx'
+import WitnessRingStatic from '@/components/WitnessRing.static.jsx'
 
 const Section = ({ title, children }) => (
   <section style={{ marginBottom: 'var(--space-7)' }}>
@@ -113,6 +115,22 @@ export default function Gallery() {
         <Section title="SceneFallback (lite / reduced-motion poster)">
           <div style={{ width: 420 }}>
             <SceneFallback name="Akṣaya Śṛṅkhala" />
+          </div>
+        </Section>
+
+        <Section title="WitnessRing — one component, three scales (strip · widget · full)">
+          <div style={{ display: 'flex', gap: 'var(--space-5)', alignItems: 'center', flexWrap: 'wrap' }}>
+            <WitnessRing scale="strip" data={{ leaves: 7, witnesses: 3 }} />
+            <WitnessRing scale="widget" data={{ leaves: 7, witnesses: 5 }} highlightLeaf={2} />
+          </div>
+          <div style={{ width: '100%' }}>
+            <WitnessRing scale="full" data={{ leaves: 7, witnesses: 3 }} highlightLeaf={4} interactive />
+          </div>
+        </Section>
+
+        <Section title="WitnessRing — static poster (lite / no-WebGL, same idea)">
+          <div style={{ width: 480 }}>
+            <WitnessRingStatic scale="full" leaves={7} witnesses={3} highlightLeaf={4} />
           </div>
         </Section>
       </div>

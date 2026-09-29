@@ -34,10 +34,12 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import io
+import os
 import re
 from datetime import datetime, timezone
 
-from fastapi import HTTPException, Response
+from fastapi import File, Form, HTTPException, Response, UploadFile
 from pydantic import BaseModel
 
 from .. import sealed
@@ -86,6 +88,24 @@ class RecipientBody(BaseModel):
     recipient_id: str
 
 
+class ComposeBody(BaseModel):
+    title: str | None = None
+    body: str
+
+
+class RecipientCreateBody(BaseModel):
+    display_name: str
+    role: str = "recipient"
+
+
+class CertificateBody(BaseModel):
+    # A "finding" is a ledger session the investigator attributed a leak to; the
+    # front end passes back the ledger index it was given. There is no separate
+    # finding store, so the index *is* the identifier -- the certificate is built
+    # straight from the ledger, which is the only thing that could be evidence.
+    finding_id: int | str
+
+
 def _b64_image(data: str) -> bytes:
     """Decode a browser data URL or a bare base64 payload."""
     if "," in data[:64] and data.lstrip().startswith("data:"):
@@ -94,6 +114,89 @@ def _b64_image(data: str) -> bytes:
         return base64.b64decode(data, validate=True)
     except Exception as e:
         raise HTTPException(400, f"image_b64 is not valid base64: {e}") from e
+
+
+_IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tif", ".tiff", ".webp")
+_TEXT_EXTS = (".txt", ".md", ".markdown", ".text", ".csv", ".log")
+
+
+def _extract_document(filename: str, content_type: str | None,
+                      data: bytes) -> tuple[str, list[dict]]:
+    """Turn an uploaded file into text, page by page, using existing paths only.
+
+    This is the whole of what the upload adapters add: an input funnel in front
+    of the *unchanged* seal and forensics pipelines. It does no cryptography and
+    no analysis; it decides how to get characters out of a file and says, per
+    page, how it did it. Three ways in, and nothing else:
+
+    - text / markdown  -> decode UTF-8 (the bytes pass through untouched).
+    - image            -> the existing tesseract OCR path.
+    - PDF              -> the text layer, via ``pypdf``, one page at a time. A
+      page with no text layer is reported as ``"none"`` rather than guessed at:
+      this build has no PDF rasteriser, so a scanned page has no honest text and
+      saying so is the point.
+
+    Returns ``(text, pages)`` where ``pages`` is a list of
+    ``{"page", "extraction", "chars"}`` for the per-page status the trace tool
+    shows. ``text`` is the concatenation a downstream stage sees.
+    """
+    name = (filename or "").lower()
+    ctype = (content_type or "").lower()
+
+    is_pdf = name.endswith(".pdf") or "pdf" in ctype
+    is_image = name.endswith(_IMAGE_EXTS) or ctype.startswith("image/")
+    is_text = name.endswith(_TEXT_EXTS) or ctype.startswith("text/")
+
+    if is_pdf:
+        try:
+            from pypdf import PdfReader
+        except ImportError as e:                       # pragma: no cover
+            raise HTTPException(
+                400, "pypdf is not installed; cannot read PDFs in this "
+                     "build") from e
+        try:
+            reader = PdfReader(io.BytesIO(data))
+        except Exception as e:
+            raise HTTPException(400, f"could not read the PDF: {e}") from e
+        parts, pages = [], []
+        for i, page in enumerate(reader.pages, start=1):
+            try:
+                t = page.extract_text() or ""
+            except Exception:
+                t = ""
+            if t.strip():
+                parts.append(t)
+                pages.append({"page": i, "extraction": "text-layer",
+                              "chars": len(t)})
+            else:
+                # No text layer, and no rasteriser here to OCR it.
+                pages.append({"page": i, "extraction": "none", "chars": 0})
+        return "\n\n".join(parts), pages
+
+    if is_image:
+        from ..watermark import ocr
+        try:
+            text = ocr.image_to_text(ocr.bytes_to_image(data))
+        except Exception as e:                         # OCRError / PIL decode
+            raise HTTPException(400, f"could not read the image: {e}") from e
+        return text, [{"page": 1, "extraction": "ocr", "chars": len(text)}]
+
+    # Text, markdown, or anything we can decode. `is_text` is a hint; a file with
+    # no useful extension still decodes if it is really text, and 400s if it is
+    # binary we have no reader for.
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError as e:
+        raise HTTPException(
+            400, f"unsupported file: not a PDF or image, and not UTF-8 text "
+                 f"({e})") from e
+    return text, [{"page": 1, "extraction": "text", "chars": len(text)}]
+
+
+def _slug(s: str) -> str:
+    """A recipient id from a display name: lowercase, ascii-ish, no surprises."""
+    out = re.sub(r"[^a-z0-9]+", "-", (s or "").lower()).strip("-")
+    return out[:32] or "recipient"
 
 
 def register_demo_routes(app, scenario) -> None:
@@ -504,6 +607,162 @@ def register_demo_routes(app, scenario) -> None:
     @app.post("/demo/admin/reinstate")
     def admin_reinstate(body: RecipientBody):
         return _set_revoked(body.recipient_id, False)
+
+    # -- source ingestion: upload / compose / capacity ---------------------
+    #
+    # These add no pipeline: an uploaded or composed body is registered as a
+    # sealable document the exact same way the curated corpus is, by living in
+    # `scenario.docs`. `/demo/distribute` seals it and the investigator aligns
+    # against it with no knowledge that it did not come from the corpus. The
+    # only new code is getting text out of a file (`_extract_document`) and
+    # reading the capacity number the watermark planner already computes.
+
+    def _capacity(text: str) -> dict:
+        from ..watermark import linguistic, payload
+
+        cfg = dep.tardos_config()
+        plan = payload.plan_for_document(
+            linguistic.slot_count(text), len(cfg["users"]),
+            cfg["colluders"], cfg["eps"])
+        # `strength` is the planner's own word -- "formal" / "ranking-only" /
+        # "none" -- never softened. It is the honest ceiling on what an
+        # attribution from this document could claim.
+        return {"positions": plan["tardos_bits"],
+                "needed": plan["tardos_required"],
+                "strength": plan["guarantee"]}
+
+    def _register_source(text: str, classification: str = "SECRET") -> dict:
+        from ..watermark import linguistic
+
+        if not text.strip():
+            raise HTTPException(400, "no text to seal: the document is empty")
+        doc_id = "SRC-" + os.urandom(4).hex().upper()
+        while any(d["doc_id"] == doc_id for d in scenario.docs):
+            doc_id = "SRC-" + os.urandom(4).hex().upper()
+        scenario.docs.append({
+            "doc_id": doc_id, "text": text, "classification": classification,
+            "slots": linguistic.slot_count(text),
+            "words": len(text.split()),
+        })
+        return {"docId": doc_id, "preview": text[:280],
+                "capacity": _capacity(text)}
+
+    @app.post("/demo/source/upload")
+    async def source_upload(file: UploadFile = File(...),
+                            title: str | None = Form(None)):
+        """Seal an uploaded file: extract its text, register it as a document."""
+        data = await file.read()
+        text, _pages = _extract_document(file.filename, file.content_type, data)
+        if not text.strip():
+            raise HTTPException(
+                400, "no extractable text: an image-only PDF cannot be sealed "
+                     "in this build (no rasteriser to OCR its pages)")
+        return _register_source(text)
+
+    @app.post("/demo/source/compose")
+    def source_compose(body: ComposeBody):
+        """Register a document typed in-app. Same path as an upload."""
+        text = body.body
+        if body.title and body.title.strip():
+            text = f"{body.title.strip()}\n\n{body.body}"
+        return _register_source(text)
+
+    @app.get("/demo/source/{doc_id}/capacity")
+    def source_capacity(doc_id: str):
+        """Watermark capacity for a chosen document, from the existing planner."""
+        try:
+            doc = scenario.doc(doc_id)
+        except KeyError:
+            raise HTTPException(404, f"no such document {doc_id}")
+        return _capacity(doc["text"])
+
+    # -- recipient enrolment from the UI -----------------------------------
+
+    @app.post("/demo/admin/recipients/create")
+    def admin_recipients_create(body: RecipientCreateBody):
+        """Enrol a new recipient via the existing CA + store path.
+
+        Companion to revoke/reinstate. The keypair is minted by the *existing*
+        `ca.enroll_recipient` (real ML-DSA); this route does no cryptography of
+        its own. `sync_store` is the same step the deployment uses at boot to
+        carry the CA's certificate into the authority's store.
+        """
+        if not body.display_name.strip():
+            raise HTTPException(400, "display_name is required")
+        rid = _slug(body.display_name)
+        existing = dep.recipients()
+        if rid in existing:
+            rid = f"{rid}-{os.urandom(2).hex()}"
+        dep.add_recipient(rid, role=body.role)
+        dep.sync_store(scenario.store)
+        cert = dep.cert_for(rid)
+        fingerprint = hashlib.sha256(bytes.fromhex(cert.sig_pub)).hexdigest()
+        return {
+            "recipientId": rid,
+            "displayName": body.display_name,
+            "role": body.role,
+            "fingerprint": fingerprint,
+            "status": "active",
+            # Stated, not hidden: the Tardos user order is frozen at deploy so
+            # marker and investigator agree on "user N". A recipient enrolled
+            # afterwards can be sent and can open documents, but is not in that
+            # order, so it is out of scope for collusion *indexing*.
+            "note": "Enrolled with a fresh ML-DSA keypair. Not added to the "
+                    "frozen Tardos user order, so it is outside collusion "
+                    "indexing until a redeploy rebuilds that order.",
+        }
+
+    # -- trace tool: check a whole uploaded document -----------------------
+
+    @app.post("/leakcheck/upload")
+    async def leakcheck_upload(file: UploadFile = File(...)):
+        """Run the *unchanged* forensic pipeline over an uploaded document.
+
+        Text is extracted page by page (text layer / OCR / passthrough) and the
+        concatenation is handed to the same `Investigator.investigate` the
+        `/leakcheck` route uses. The response is that route's shape plus a
+        per-page `pages` list; nothing about the result is summarised here.
+        """
+        data = await file.read()
+        text, pages = _extract_document(file.filename, file.content_type, data)
+        inv = scenario.investigator().investigate(leaked_text=text)
+        result = inv.as_dict()
+        result["simulated"] = list(SIMULATED)
+        result["pages"] = pages
+        return result
+
+    # -- certificate: an independently-verifiable evidence bundle ----------
+
+    @app.post("/evidence/certificate")
+    def evidence_certificate(body: CertificateBody):
+        """Build the evidence bundle for a finding (a ledger session index).
+
+        Presentation adapter over the *existing* `BundleExporter`: it produces
+        the same JSON `verifier/` checks, with no new proof logic. The
+        human-readable Pramāṇapatra PDF is a later presentation step; the JSON is
+        the load-bearing artefact and is returned now.
+        """
+        from ..forensics.bundle import BundleExporter, ExportError
+
+        try:
+            idx = int(body.finding_id)
+        except (TypeError, ValueError):
+            raise HTTPException(
+                400, f"finding_id must be a ledger index, got "
+                     f"{body.finding_id!r}")
+        exporter = BundleExporter.from_deployment(dep, scenario.log)
+        anchors = dep.anchorer().records() if dep.anchorer() is not None else None
+        try:
+            bundle = exporter.bundle(scenario.log, [idx], anchors)
+        except ExportError as e:
+            raise HTTPException(400, str(e)) from e
+        return {
+            "pdf": None,
+            "json": bundle,
+            "note": "This JSON is the independently-verifiable evidence bundle; "
+                    "check it with the standalone verifier/. A human-readable "
+                    "Pramāṇapatra PDF is a later presentation step.",
+        }
 
 
 def _enrolled_device_fp(dep, recipient_id: str) -> str | None:

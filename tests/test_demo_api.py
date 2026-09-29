@@ -582,3 +582,119 @@ def test_the_session_row_keeps_the_device_fingerprint_the_request_carried(
         "means the request is not carrying the enrolled value")
     assert carol["last_seen_device_fp"] != "unbound-device", (
         "the constant placeholder is still reaching the store")
+
+
+# ==========================================================================
+# Lane C glue: source ingestion, recipient enrolment, upload trace, certificate
+# (design plan §13.2). These are adapters in front of the unchanged pipeline;
+# each test asserts the adapter fed the real path, not that it re-implemented it.
+# ==========================================================================
+
+def _pdf_bytes(text: str) -> bytes:
+    """A minimal PDF with a real text layer, for the upload paths."""
+    from fpdf import FPDF
+
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Helvetica", size=12)
+    pdf.multi_cell(0, 6, text)
+    return bytes(pdf.output())
+
+
+def test_compose_registers_a_sealable_document(client):
+    r = client.post("/demo/source/compose",
+                    json={"title": "Fleet order", "body": "hold the line " * 60})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["docId"].startswith("SRC-")
+    assert set(body["capacity"]) == {"positions", "needed", "strength"}
+    assert "hold the line" in body["preview"]
+    # The point of registration: the *existing* seal route now accepts it.
+    d = client.post("/demo/distribute",
+                    json={"doc_id": body["docId"], "recipients": ["alice"]})
+    assert d.status_code == 200, d.text
+
+
+def test_upload_text_file_registers_document(client):
+    payload = ("classified movement plan " * 80).encode("utf-8")
+    r = client.post("/demo/source/upload",
+                    files={"file": ("plan.txt", payload, "text/plain")})
+    assert r.status_code == 200, r.text
+    assert r.json()["docId"].startswith("SRC-")
+
+
+def test_upload_pdf_extracts_text_layer(client):
+    data = _pdf_bytes("northern approach convoy schedule " * 60)
+    r = client.post("/demo/source/upload",
+                    files={"file": ("plan.pdf", data, "application/pdf")})
+    assert r.status_code == 200, r.text
+    assert "convoy" in r.json()["preview"]
+
+
+def test_upload_of_binary_junk_fails_closed(client):
+    r = client.post("/demo/source/upload",
+                    files={"file": ("x.bin", b"\x00\x01\x02\xff\xfe", None)})
+    assert r.status_code == 400
+    assert "detail" in r.json()
+
+
+def test_create_recipient_enrols_and_shows_up(client):
+    r = client.post("/demo/admin/recipients/create",
+                    json={"display_name": "New Officer", "role": "analyst"})
+    assert r.status_code == 200, r.text
+    card = r.json()
+    assert card["status"] == "active"
+    assert card["role"] == "analyst"
+    assert len(card["fingerprint"]) == 64  # sha256 hex, mono in the UI
+    rid = card["recipientId"]
+    listed = client.get("/demo/admin/recipients").json()["recipients"]
+    assert any(x["recipient_id"] == rid for x in listed), (
+        "a freshly enrolled recipient must appear in the authority's store")
+    # Companion to the existing revoke path: it must accept the new id.
+    rev = client.post("/demo/admin/revoke", json={"recipient_id": rid})
+    assert rev.status_code == 200, rev.text
+
+
+def test_source_capacity_matches_the_documents_route(client):
+    cap = client.get("/demo/source/DOC-0000/capacity").json()
+    doc = next(d for d in client.get("/demo/documents").json()["documents"]
+               if d["doc_id"] == "DOC-0000")
+    assert cap["positions"] == doc["tardos_positions"]
+    assert cap["needed"] == doc["tardos_required"]
+
+
+def test_source_capacity_404s_for_unknown_document(client):
+    r = client.get("/demo/source/DOC-9999/capacity")
+    assert r.status_code == 404
+
+
+def test_leakcheck_upload_identifies_and_reports_pages(client, opened):
+    leaked = opened.get("marked_text") or opened["plaintext"]
+    data = _pdf_bytes(leaked)
+    r = client.post("/leakcheck/upload",
+                    files={"file": ("leak.pdf", data, "application/pdf")})
+    assert r.status_code == 200, r.text
+    result = r.json()
+    # Same shape as /leakcheck (document/watermark/caveat) plus per-page status.
+    assert result["document"]["doc_id"] == "DOC-0000"
+    assert result["pages"] and result["pages"][0]["extraction"] == "text-layer"
+    assert result["caveat"], "the attribution caveat must survive the adapter"
+
+
+def test_certificate_returns_a_selfchecking_bundle(client, opened):
+    idx = opened["ledger_entry"]["index"]
+    r = client.post("/evidence/certificate", json={"finding_id": idx})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["pdf"] is None
+    from logfirst.forensics.bundle import selfcheck
+
+    assert body["json"]["entries"], "an empty bundle proves nothing"
+    assert selfcheck(body["json"])["ok"], (
+        "the bundle the certificate route builds must pass the system's own "
+        "evidence check")
+
+
+def test_certificate_rejects_a_non_index(client):
+    r = client.post("/evidence/certificate", json={"finding_id": "not-an-index"})
+    assert r.status_code == 400

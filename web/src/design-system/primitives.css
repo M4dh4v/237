@@ -1,0 +1,124 @@
+/* Design-system primitives. Token-only, no hex, no new dep. Solid quiet
+ * surfaces (no glassmorphism), small consistent corners, one considered shadow.
+ * The accent is spent ONCE per screen — .btn--primary is that one place; do not
+ * scatter it.
+ */
+
+/* ---- Button ---------------------------------------------------------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: var(--text-sm);
+  line-height: 1;
+  border-radius: var(--radius);
+  border: 1px solid var(--hairline);
+  background: var(--bg-elevated);
+  color: var(--ink);
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+.btn:hover:not(:disabled) { border-color: var(--ink-faint); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn--sm { padding: 6px 10px; font-size: var(--text-xs); }
+
+/* the ONE accent action — outline + glow, never a filled purple blob */
+.btn--primary {
+  border-color: var(--accent-soft);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-elevated));
+}
+.btn--primary:hover:not(:disabled) {
+  border-color: var(--accent);
+  box-shadow: var(--glow-accent);
+}
+
+.btn--ghost { background: transparent; }
+.btn--quiet {
+  background: transparent;
+  border-color: transparent;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-weight: 400;
+}
+.btn--quiet:hover:not(:disabled) { color: var(--ink); border-color: var(--hairline); }
+
+/* the disabled-with-hint pattern (backend unreachable etc.) */
+.btn__hint {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+}
+
+/* ---- Panel ----------------------------------------------------------- */
+.panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-1);
+}
+.panel--elevated { background: var(--bg-elevated); box-shadow: var(--shadow-2); }
+.panel__pad { padding: var(--space-5); }
+
+/* ---- Chip ------------------------------------------------------------ */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--hairline);
+  background: var(--bg-panel);
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  cursor: default;
+  transition: border-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+.chip--selectable { cursor: pointer; }
+.chip--selectable:hover { border-color: var(--ink-faint); color: var(--ink); }
+.chip--selected {
+  border-color: var(--accent-soft);
+  color: var(--accent);
+  box-shadow: var(--glow-accent);
+}
+
+/* ---- Banner (generic inline notice; NOT the classification banner) --- */
+.banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--hairline);
+  border-left-width: 2px;
+  border-left-color: var(--struct-2);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+
+/* ---- Hash (mono value, ellipsis-middle, copy-on-click) --------------- */
+.hash {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: copy;
+  max-width: 100%;
+  display: inline-flex;
+  align-items: baseline;
+}
+.hash:hover { color: var(--ink); }
+.hash__copied { color: var(--verified); margin-left: var(--space-2); }

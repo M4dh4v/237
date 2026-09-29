@@ -18,6 +18,8 @@ import Anvesana from './dashboards/Anvesana.jsx'
 // now so Lane A drops real R3F in without touching the shell.
 const GateScene = lazy(() => import('./scenes/GateScene.jsx'))
 const WitnessRingScene = lazy(() => import('./scenes/WitnessRingScene.jsx'))
+// Dev-only design gallery (not linked in product nav).
+const Gallery = lazy(() => import('./design-system/Gallery.jsx'))
 
 export default function App() {
   return (
@@ -62,6 +64,14 @@ export default function App() {
               <Authed>
                 <Ledger />
               </Authed>
+            }
+          />
+          <Route
+            path="/_ds"
+            element={
+              <Suspense fallback={null}>
+                <Gallery />
+              </Suspense>
             }
           />
           <Route path="*" element={<Landing />} />

@@ -12,6 +12,7 @@
  */
 
 @import './fonts.css';
+@import './scale.css';
 
 :root {
   /* surfaces — the room the instrument sits in */

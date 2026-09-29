@@ -1,0 +1,33 @@
+/* Type / space / shadow scale — derived, adds no hex. tokens.css owns colour
+ * and the base --gap/--radius; this owns rhythm. One committed scale so every
+ * surface shares the same intervals (anti-slop: "everything the same size" is a
+ * tell — a real scale is the antidote).
+ */
+
+:root {
+  /* spacing — 4px base, the intervals everything snaps to */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;   /* == --gap */
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  /* type — a real scale, display face carries the personality */
+  --text-xs:  12px;
+  --text-sm:  13px;
+  --text-base: 15px;
+  --text-md:  17px;
+  --text-lg:  20px;
+  --text-xl:  26px;
+  --text-2xl: 34px;
+  --text-3xl: clamp(40px, 8vw, 88px);  /* the SĀKṢYA wordmark size */
+
+  /* one considered shadow system — mostly flat, sharp reads as instrument */
+  --shadow-1: 0 1px 0 rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.45);
+  /* the single accent glow — spent ONCE per screen, never as decoration */
+  --glow-accent: 0 0 0 1px var(--accent-soft), 0 0 20px -6px var(--accent);
+}

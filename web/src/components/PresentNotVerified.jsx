@@ -23,7 +23,7 @@ export default function PresentNotVerified({ inline = false }) {
         lineHeight: 1.45,
       }}
     >
-      <strong style={{ color: 'var(--ink)', fontWeight: 500 }}>present, as received</strong>
+      <strong style={{ color: 'var(--ink)', fontWeight: 500, whiteSpace: 'nowrap', flexShrink: 0 }}>present, as received</strong>
       {inline ? null : (
         <span>
           — the browser shows the proof but cannot verify post-quantum signatures.

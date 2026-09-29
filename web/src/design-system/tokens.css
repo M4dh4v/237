@@ -1,0 +1,55 @@
+/* SĀKṢYA design tokens — THEME_A "Abyssal Sonar".
+ *
+ * The one law: one accent per screen, pointed at the thing that wins the
+ * screen. Structure is cool (indigo -> cyan); the accent (ice signal) is used
+ * once, at the moment that matters. --verified and --alert are RESERVED:
+ * green only where something was actually checked, red only at real failure or
+ * an unknown source. Neither is ever decoration (enforced in review).
+ *
+ * Every variable named in web/src/design-system/contract.md is defined here.
+ * No lane hardcodes hex — read these. Values are frozen by the chosen theme;
+ * names are frozen by the contract.
+ */
+
+@import './fonts.css';
+
+:root {
+  /* surfaces — the room the instrument sits in */
+  --bg:          #05070A;
+  --bg-panel:    #0B111A;
+  --bg-elevated: #111A26;
+  --hairline:    #1B2733;
+
+  /* text — never pure white on pure black */
+  --ink:       #E6EDF3;
+  --ink-muted: #7D8896;
+  --ink-faint: #4A5563;
+
+  /* structure — the cool gradient stops (lines / "thinking" states only) */
+  --struct-1: #3D5AFE;
+  --struct-2: #22D3EE;
+
+  /* the one accent — ice signal, one glow per screen */
+  --accent:      #7DF9FF;
+  --accent-soft: #2FB6C4;
+
+  /* reserved status — do not use as decoration */
+  --verified: #34D399;
+  --alert:    #FF5470;
+
+  /* type — vendored locally in fonts.css, no CDN */
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-body:    'Inter', system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace;
+
+  /* motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 140ms;
+  --dur-slow: 520ms;
+
+  /* geometry — sharp reads as "instrument"; corners stay 2-6px */
+  --radius:   4px;
+  --gap:      16px;
+  --rail-w:   264px;
+  --strip-h:  40px;
+}

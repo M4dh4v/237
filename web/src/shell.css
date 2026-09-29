@@ -1,0 +1,76 @@
+/* App shell — the frame every route mounts inside. Layout and base only;
+ * surfaces pull their colour from tokens.css. Kept small on purpose: real
+ * primitives are Lane A's job. Never hardcode a themeable colour here.
+ */
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+code, .mono { font-family: var(--font-mono); }
+
+a { color: var(--accent-soft); text-decoration: none; }
+a:hover { color: var(--accent); }
+
+button { font-family: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* --- shell frame --------------------------------------------------------- */
+
+.shell { min-height: 100%; display: flex; flex-direction: column; }
+
+/* status strip sits at the very top of authed routes */
+.shell__strip { flex: 0 0 auto; }
+
+.shell__body { flex: 1 1 auto; min-height: 0; }
+
+/* a plain full-bleed stage for routes that are not the landing */
+.stage {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: calc(var(--gap) * 2) var(--gap);
+}
+
+/* the placeholder look for stub surfaces — quiet, not shouty */
+.placeholder {
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  padding: calc(var(--gap) * 1.5);
+  color: var(--ink-muted);
+}
+.placeholder h2 { color: var(--ink); margin-bottom: 8px; }
+.placeholder .lane-tag {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent-soft);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  padding: 2px 8px;
+  margin-top: var(--gap);
+}

@@ -145,6 +145,65 @@ const get = (path) => request(path)
 const post = (path, body) => request(path, { method: 'POST', body })
 
 /**
+ * A POST carrying a file as multipart/form-data, for the upload adapters
+ * (contract §2 methods 1 and 4). Kept separate from `request` because `request`
+ * JSON-encodes its body and sets a JSON content-type; a file needs neither.
+ * Error handling mirrors `request` so the same isFailClosed/isUnreachable
+ * contract holds for uploads too.
+ */
+async function postForm(path, formData, { signal } = {}) {
+  let res
+  try {
+    res = await fetch(path, { method: 'POST', body: formData, signal })
+  } catch (e) {
+    if (e && e.name === 'AbortError') throw e
+    throw new ApiError(BACKEND_HINT, { kind: 'unreachable', url: path })
+  }
+  if (!res.ok) {
+    const detail = await readDetail(res)
+    if (res.status >= 500 && detail === null) {
+      throw new ApiError(BACKEND_HINT, { kind: 'unreachable', status: res.status, url: path })
+    }
+    throw new ApiError(detail || `the backend answered ${res.status} for ${path}`, {
+      kind: 'http',
+      status: res.status,
+      detail,
+      url: path,
+    })
+  }
+  try {
+    return await res.json()
+  } catch {
+    throw new ApiError(`the backend sent a response that is not JSON for ${path}`, {
+      kind: 'malformed',
+      status: res.status,
+      url: path,
+    })
+  }
+}
+
+/**
+ * P0 bootstrap flag. While true, the six NEW glue methods return realistic mock
+ * data so Lanes A and B are never blocked waiting on Lane C's backend routes.
+ * Lane C flips this to false once the /demo/source/*, recipients/create,
+ * /leakcheck/upload, and /evidence/certificate adapters land — the signatures
+ * and return shapes are frozen (contract §2), so nothing above notices.
+ * Existing methods never consult this flag; they always hit the real backend.
+ */
+const DEMO_STUBS = true
+
+// A small deterministic delay so stubbed calls exercise the same loading states
+// (pipeline step names, forming seal) the real ones will — never a bare spinner.
+const mock = (value, ms = 350) => new Promise((resolve) => setTimeout(() => resolve(value), ms))
+
+// A stable fake mono id, so hashes render in the mono face and look like hashes.
+const fakeHash = (n = 64) =>
+  Array.from({ length: n }, (_, i) => '0123456789abcdef'[(i * 7 + 3) % 16]).join('')
+
+const mockCapacity = () => ({ positions: 428, needed: 1201, strength: 'ranks likely colluders; not a formal FPR bound at this length' })
+
+
+/**
  * A GET that returns bytes rather than JSON, for the one route that serves a
  * file. Kept separate from `request` because `request`'s "always JSON, throw
  * otherwise" contract is what `isFailClosed` and `isUnreachable` are built on,
@@ -240,4 +299,92 @@ export const api = {
   witnesses: () => get('/witnesses'),
   health: () => get('/health'),
   anchors: () => get('/anchors'),
+
+  // --- NEW glue methods (contract §2). Frozen signatures + return shapes.
+  // Stubbed until Lane C lands the adapter routes (design plan §13.2). -------
+
+  /** Seal an arbitrary uploaded file (PDF/image/text) -> sealable document. */
+  uploadSource: (file, opts) => {
+    if (DEMO_STUBS) {
+      return mock({
+        docId: 'src-' + fakeHash(8),
+        preview: file?.name ? `extracted body of “${file.name}”` : 'extracted document body',
+        capacity: mockCapacity(),
+      })
+    }
+    const fd = new FormData()
+    fd.append('file', file)
+    if (opts?.title) fd.append('title', opts.title)
+    return postForm('/demo/source/upload', fd, opts)
+  },
+
+  /** Compose a document in-app -> sealable document. */
+  composeSource: ({ title, body }) => {
+    if (DEMO_STUBS) {
+      return mock({
+        docId: 'src-' + fakeHash(8),
+        preview: (body || '').slice(0, 280) || `(empty) ${title || ''}`.trim(),
+        capacity: mockCapacity(),
+      })
+    }
+    return post('/demo/source/compose', { title, body })
+  },
+
+  /** Enroll a new recipient (server generates the PQC keypair). */
+  createRecipient: ({ displayName, role }) => {
+    if (DEMO_STUBS) {
+      return mock({
+        recipientId: 'rcpt-' + fakeHash(8),
+        displayName: displayName || 'Unnamed recipient',
+        role: role || 'recipient',
+        fingerprint: fakeHash(64),
+        status: 'active',
+      })
+    }
+    return post('/demo/admin/recipients/create', { display_name: displayName, role })
+  },
+
+  /** Trace tool: submit a whole uploaded document (multi-page). Same shape as
+   *  leakcheck, plus per-page extraction status. */
+  uploadLeak: (file, opts) => {
+    if (DEMO_STUBS) {
+      return mock({
+        // document match and recipient attribution are TWO separate confidences,
+        // never one merged number (sakshya-honesty §5).
+        documentMatch: { docId: 'src-' + fakeHash(8), confidence: 0.94 },
+        recipientAttribution: { recipientId: 'rcpt-' + fakeHash(8), leaf: 7, confidence: 0.81 },
+        pages: [
+          { page: 1, extraction: 'text-layer', chars: 3120 },
+          { page: 2, extraction: 'ocr-fallback', chars: 880 },
+        ],
+      }, 900)
+    }
+    const fd = new FormData()
+    fd.append('file', file)
+    return postForm('/leakcheck/upload', fd, opts)
+  },
+
+  /** Watermark capacity / expected strength for a chosen document. */
+  sourceCapacity: (docId) => {
+    if (DEMO_STUBS) return mock(mockCapacity())
+    return get(`/demo/source/${encodeURIComponent(docId)}/capacity`)
+  },
+
+  /** Render the Pramāṇapatra (PDF for humans, JSON for the verifier). */
+  certificate: (findingId) => {
+    if (DEMO_STUBS) {
+      return mock({
+        pdf: `blob:mock/pramanapatra-${findingId || 'finding'}.pdf`,
+        json: {
+          finding: findingId || 'finding-0',
+          documentMatch: { docId: 'src-' + fakeHash(8), confidence: 0.94 },
+          recipientAttribution: { recipientId: 'rcpt-' + fakeHash(8), leaf: 7, confidence: 0.81 },
+          caveats: ['proves-key', 'ranking', 'text-domain'],
+          verifier: 'independent — verify with the standalone verifier/',
+        },
+      })
+    }
+    return post('/evidence/certificate', { finding_id: findingId })
+  },
 }
+

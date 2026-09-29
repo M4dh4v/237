@@ -1,0 +1,20 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "space grotesk",
+        "createdAt": "2026-09-29T22:10:24.879Z",
+        "reason": "design plan §4 / playbook Part 2 / contract §1 mandate Space Grotesk as the display face; user confirmed THEME_A"
+      },
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "createdAt": "2026-09-29T22:10:24.887Z",
+        "reason": "design plan §4 / playbook Part 2 / contract §1 mandate Inter as the body face; user confirmed THEME_A"
+      }
+    ]
+  }
+}

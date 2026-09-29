@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { fileURLToPath, URL } from 'node:url'
 
 // The proxy exists so the app can call the API with same-origin *relative*
 // URLs. That is not a convenience: the backend runs on plain HTTP at
@@ -32,6 +33,12 @@ const proxy = Object.fromEntries(
 
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    // `@` -> web/src, the import root every lane uses (contract §3).
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    },
+  },
   server: {
     port: 5173,
     strictPort: true,

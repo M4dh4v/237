@@ -42,6 +42,15 @@ export default defineConfig({
   server: {
     port: 7891,
     strictPort: true,
+    // Vite rejects requests whose Host header it does not recognise, which is
+    // what "Blocked request. This host is not allowed" was. The console is
+    // reached at saksya.tech through a reverse proxy, so the Host header that
+    // arrives here is that domain, not the bind address. `true` allows any
+    // host, which is what we want: this listens on 0.0.0.0 by design and is
+    // already reachable from the network. The check would only matter for a
+    // server exposed to the open internet with DNS pointing elsewhere, and the
+    // DNS-rebinding it guards against is not the threat model here.
+    allowedHosts: true,
     proxy,
   },
   // `vite preview` serves the built dist/ -- it is what the pm2 deployment
@@ -58,6 +67,7 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 7891,
     strictPort: true,
+    allowedHosts: true, // same reasoning as server.allowedHosts above
     proxy,
   },
   build: {

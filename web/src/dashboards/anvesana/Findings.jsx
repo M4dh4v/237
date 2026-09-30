@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { WitnessRing, PresentNotVerified, Caveat } from '@/components'
 import { Panel, Pill, mono } from '../_shared/ui.jsx'
+import { CertificateLauncher } from '../Pramanapatra.jsx'
 
 /**
  * Findings — the result of an investigation (design plan §9, sakshya-honesty §5).
@@ -19,11 +20,14 @@ export default function Findings({ result }) {
   const v = useMemo(() => normalize(result), [result])
 
   return (
-    <div style={{ display: 'grid', gap: 'calc(var(--gap) * 1.5)' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 'calc(var(--gap) * 1.5)' }}>
-        <DocumentPanel doc={v.document} />
-        <AttributionPanel attr={v.attribution} candidates={v.candidates} status={v.status} />
-      </div>
+    <div style={{ display: 'grid', gap: 'calc(var(--gap) * 2)' }}>
+      <section>
+        <SectionLabel>the two answers</SectionLabel>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 'calc(var(--gap) * 1.5)' }}>
+          <DocumentPanel doc={v.document} />
+          <AttributionPanel attr={v.attribution} candidates={v.candidates} status={v.status} />
+        </div>
+      </section>
 
       {v.candidates.length > 1 ? <Ranking candidates={v.candidates} /> : null}
 
@@ -31,10 +35,14 @@ export default function Findings({ result }) {
 
       {v.verification ? <Verification report={v.verification} /> : null}
 
-      {v.caveat ? (
-        <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-muted)', lineHeight: 1.5 }}>{v.caveat}</p>
+      {v.caveat || v.simulated ? (
+        <div style={{ display: 'grid', gap: 'var(--gap)' }}>
+          {v.simulated ? <Caveat kind="simulated" /> : null}
+          {v.caveat ? (
+            <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-faint)', lineHeight: 1.5 }}>{v.caveat}</p>
+          ) : null}
+        </div>
       ) : null}
-      {v.simulated ? <Caveat kind="simulated" /> : null}
     </div>
   )
 }
@@ -79,21 +87,21 @@ function normalize(r) {
 function DocumentPanel({ doc }) {
   const hasDoc = doc.docId != null
   return (
-    <Panel>
+    <Panel style={{ display: 'grid', gap: 12 }}>
       <PanelHead>which document</PanelHead>
       {hasDoc ? (
         <>
-          <div style={{ ...mono, fontSize: 16, color: 'var(--ink)', marginBottom: 6 }}>{doc.docId}</div>
+          <div style={{ ...mono, fontSize: 20, color: 'var(--ink)' }}>{doc.docId}</div>
           <Bar value={doc.confidence} color="var(--struct-1)" label="alignment against the sealed corpus" />
           {doc.ambiguous ? (
-            <p style={{ margin: '10px 0 0', fontSize: 12, color: 'var(--accent-soft)', lineHeight: 1.5 }}>
-              More than one document aligns closely — the top match is not decisive on its own.
+            <p style={{ margin: 0, fontSize: 12, color: 'var(--accent-soft)', lineHeight: 1.5 }}>
+              More than one document aligns closely — the top match is not decisive alone.
             </p>
           ) : null}
         </>
       ) : (
         <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-muted)', lineHeight: 1.5 }}>
-          The leaked text did not align with any document in the sealed corpus.
+          No document in the sealed corpus aligns with this text.
         </p>
       )}
     </Panel>
@@ -104,15 +112,15 @@ function AttributionPanel({ attr, candidates, status }) {
   const named = attr.recipientId
   const top = candidates[0]
   return (
-    <Panel>
+    <Panel style={{ display: 'grid', gap: 12 }}>
       <PanelHead>whose copy</PanelHead>
       {named ? (
         <>
-          <div style={{ ...mono, fontSize: 16, color: 'var(--ink)', marginBottom: 6 }}>{named}</div>
+          <div style={{ ...mono, fontSize: 20, color: 'var(--ink)' }}>{named}</div>
           <Bar value={attr.confidence} color="var(--accent)" label="watermark recovery confidence" />
           {attr.tardos?.positions != null ? (
-            <div style={{ ...mono, fontSize: 11, color: 'var(--ink-faint)', marginTop: 8 }}>
-              {attr.tardos.positions}/{attr.tardos.required} mark positions recovered · guarantee: {attr.tardos.guarantee}
+            <div style={{ ...mono, fontSize: 11, color: 'var(--ink-faint)' }}>
+              {attr.tardos.positions}/{attr.tardos.required} mark positions · {attr.tardos.guarantee} guarantee
             </div>
           ) : null}
         </>
@@ -121,30 +129,28 @@ function AttributionPanel({ attr, candidates, status }) {
           {status === 'collusion-suspected'
             ? 'The mark carries more than one recipient — no single copy is named. See the ranking below.'
             : status === 'no-watermark'
-            ? 'No recoverable mark survived in this artefact, so no copy can be named.'
+            ? 'No recoverable mark survived, so no copy can be named.'
             : top
-            ? 'A candidate leads the ranking but does not cross the accusation threshold — not enough to name a copy.'
+            ? 'A candidate leads but does not cross the accusation threshold — not enough to name a copy.'
             : 'No attribution: the mark did not decode to a recipient.'}
         </p>
       )}
-      <div style={{ marginTop: 'var(--gap)' }}>
-        <Caveat kind="ranking" />
-      </div>
     </Panel>
   )
 }
 
 function Ranking({ candidates }) {
   return (
-    <Panel>
-      <PanelHead>ranked candidates</PanelHead>
-      <p style={{ margin: '0 0 var(--gap)', fontSize: 12, color: 'var(--ink-muted)', lineHeight: 1.5 }}>
-        When the mark points at more than one copy — the collusion case — every candidate is listed with the
-        evidence that put them there. A rank is not an accusation.
-      </p>
-      <div style={{ display: 'grid', gap: 6 }}>
+    <Panel style={{ display: 'grid', gap: 'var(--gap)' }}>
+      <div>
+        <PanelHead>ranked candidates</PanelHead>
+        <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-muted)', lineHeight: 1.5 }}>
+          The collusion case: each copy the mark touches, with its evidence. A rank is not an accusation.
+        </p>
+      </div>
+      <div style={{ display: 'grid', gap: 8 }}>
         {candidates.map((c, i) => (
-          <div key={c.recipient_id || i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 10px', border: '1px solid var(--hairline)', borderRadius: 'var(--radius)', background: 'var(--bg-panel)' }}>
+          <div key={c.recipient_id || i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', border: '1px solid var(--hairline)', borderRadius: 'var(--radius)', background: 'var(--bg)' }}>
             <span style={{ ...mono, fontSize: 11, color: 'var(--ink-faint)', width: 20 }}>#{i + 1}</span>
             <span style={{ ...mono, fontSize: 13, flex: 1 }}>{c.recipient_id}</span>
             {c.tardos_score != null ? (
@@ -156,6 +162,7 @@ function Ranking({ candidates }) {
           </div>
         ))}
       </div>
+      <Caveat kind="ranking" />
     </Panel>
   )
 }
@@ -163,23 +170,27 @@ function Ranking({ candidates }) {
 function LedgerLink({ attr }) {
   if (attr.leaf == null) return null
   return (
-    <Panel style={{ display: 'grid', gridTemplateColumns: 'auto minmax(0,1fr)', gap: 'calc(var(--gap) * 1.5)', alignItems: 'center' }}>
-      <WitnessRing scale="widget" data={{ witnesses: 3 }} highlightLeaf={attr.leaf} />
-      <div>
-        <PanelHead>the entry it points at</PanelHead>
-        <p style={{ margin: '0 0 6px', fontSize: 13, color: 'var(--ink-muted)', lineHeight: 1.5 }}>
-          The recovered mark is a pointer to one leaf of the witnessed ledger — the open event that released this copy.
-        </p>
-        <div style={{ ...mono, fontSize: 13, color: 'var(--ink)' }}>leaf #{attr.leaf}</div>
+    <Panel style={{ display: 'grid', gap: 'calc(var(--gap) * 1.25)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'auto minmax(0,1fr)', gap: 'calc(var(--gap) * 1.5)', alignItems: 'center' }}>
+        <WitnessRing scale="widget" data={{ witnesses: 3 }} highlightLeaf={attr.leaf} />
+        <div style={{ display: 'grid', gap: 6 }}>
+          <PanelHead>the entry it points at</PanelHead>
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-muted)', lineHeight: 1.5 }}>
+            The mark is a pointer to one leaf of the witnessed ledger — the open that released this copy.
+          </p>
+          <div style={{ ...mono, fontSize: 14, color: 'var(--ink)' }}>leaf #{attr.leaf}</div>
+        </div>
       </div>
+      <CertificateLauncher findingId={attr.leaf} />
     </Panel>
   )
 }
 
 /**
  * Present-not-verified: we show the pipeline's own verification checks as a
- * checklist of what it re-derived, never as a green "verified" badge. The
- * shared component owns that wording; we hand it the boolean.
+ * checklist of what it re-derived, never as a green "verified" badge. Folded
+ * into a disclosure so the default result stays calm — the detail is one click
+ * away, not a wall. The shared component owns the "not verified here" wording.
  */
 function Verification({ report }) {
   const checks = [
@@ -189,9 +200,8 @@ function Verification({ report }) {
     ['witness quorum', report.witness_quorum_ok],
   ]
   return (
-    <Panel>
-      <PanelHead>what was re-checked</PanelHead>
-      <div style={{ display: 'grid', gap: 4, marginBottom: 'var(--gap)' }}>
+    <Disclosure label="what was re-checked">
+      <div style={{ display: 'grid', gap: 6, marginBottom: 'var(--gap)' }}>
         {checks.map(([k, ok]) => (
           <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '2px 0' }}>
             <span style={{ color: 'var(--ink-muted)' }}>{k}</span>
@@ -199,9 +209,29 @@ function Verification({ report }) {
           </div>
         ))}
       </div>
-      {report.index != null ? <div style={{ ...mono, fontSize: 11, color: 'var(--ink-faint)', marginBottom: 8 }}>ledger entry #{report.index}</div> : null}
+      {report.index != null ? <div style={{ ...mono, fontSize: 11, color: 'var(--ink-faint)', marginBottom: 10 }}>ledger entry #{report.index}</div> : null}
       <PresentNotVerified />
-    </Panel>
+    </Disclosure>
+  )
+}
+
+/** A quiet native expander — secondary detail folded away by default. */
+function Disclosure({ label, children }) {
+  return (
+    <details className="lb-disclosure">
+      <summary style={{ ...mono, fontSize: 11, color: 'var(--ink-muted)', letterSpacing: '0.06em', textTransform: 'uppercase', cursor: 'pointer', listStyle: 'none', padding: '4px 0' }}>
+        {label}
+      </summary>
+      <div style={{ paddingTop: 'var(--gap)' }}>{children}</div>
+    </details>
+  )
+}
+
+function SectionLabel({ children }) {
+  return (
+    <div style={{ ...mono, fontSize: 11, color: 'var(--ink-faint)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
+      {children}
+    </div>
   )
 }
 
@@ -215,15 +245,15 @@ function PanelHead({ children }) {
 
 /** A confidence as a bar, never a verdict. Value is 0..1. */
 function Bar({ value, color, label }) {
-  const pct = Math.max(0, Math.min(1, Number(value) || 0)) * 100
+  const frac = Math.max(0, Math.min(1, Number(value) || 0))
   return (
     <div>
       <div style={{ height: 8, borderRadius: 4, background: 'var(--bg-elevated)', overflow: 'hidden', border: '1px solid var(--hairline)' }}>
-        <div style={{ height: '100%', width: `${pct}%`, background: color, transition: 'width .5s ease' }} />
+        <div style={{ height: '100%', width: '100%', background: color, transformOrigin: 'left', transform: `scaleX(${frac})`, transition: 'transform .5s ease' }} />
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5 }}>
         <span style={{ fontSize: 11, color: 'var(--ink-faint)' }}>{label}</span>
-        <span style={{ ...mono, fontSize: 11, color: 'var(--ink-muted)' }}>{pct.toFixed(0)}%</span>
+        <span style={{ ...mono, fontSize: 11, color: 'var(--ink-muted)' }}>{(frac * 100).toFixed(0)}%</span>
       </div>
     </div>
   )

@@ -1,14 +1,16 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api } from '@/api.js'
 import { WitnessRing, PresentNotVerified, Caveat, ClassificationBanner } from '@/components'
 import { useAsync } from './_shared/useAsync.jsx'
 import { Loading, ErrorState } from './_shared/Async.jsx'
-import { Button, Field, Input, Panel, mono, shortHash } from './_shared/ui.jsx'
+import { Button, Field, Input, Panel, Workspace, PageHead, mono, shortHash } from './_shared/ui.jsx'
 import './dashboards.css'
 
 /**
  * Pramāṇapatra — the certificate of proof (design plan §11). Pulled from any
  * finding: a ledger entry index (an open event, or the leaf a trace pointed at).
+ * It is not a fourth door; it is launched from an open receipt or a trace result
+ * (see CertificateLauncher), and also stands alone with a finding-id intake.
  *
  * The load-bearing artefact is the JSON evidence bundle, checkable by the
  * standalone verifier/. This screen renders the human-readable face of it and
@@ -17,45 +19,73 @@ import './dashboards.css'
  * PresentNotVerified strip, exactly who does the verifying. The wax seal is a
  * seal, not a checkmark.
  */
-export default function Pramanapatra() {
+export default function Pramanapatra({ findingId }) {
   const cert = useAsync()
-  const [id, setId] = useState('')
+  const [id, setId] = useState(findingId != null ? String(findingId) : '')
 
-  const build = () => {
-    const n = id.trim()
+  const build = (value) => {
+    const n = String(value ?? id).trim()
     if (n === '') return
     cert.run(() => api.certificate(n)).catch(() => {})
   }
 
-  return (
-    <div style={{ padding: 'calc(var(--gap) * 1.5)', display: 'grid', gap: 'calc(var(--gap) * 1.5)' }}>
-      <div>
-        <h2 style={{ fontSize: 24, fontFamily: 'var(--font-display)' }}>Pramāṇapatra</h2>
-        <p style={{ color: 'var(--ink-muted)', margin: '4px 0 0', maxWidth: 620, lineHeight: 1.5 }}>
-          The evidence bundle for one finding, as a certificate. The JSON below is what an independent
-          verifier checks — this page renders its human face and does not itself sit in judgement.
-        </p>
-      </div>
+  // Launched from a finding: build immediately, skip the intake.
+  const pinned = findingId != null
+  useEffect(() => { if (pinned) build(findingId) }, []) // eslint-disable-line
 
-      <Panel style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 'var(--gap)', alignItems: 'end' }}>
-        <Field label="Finding — the ledger entry index it rests on">
-          <Input value={id} onChange={(e) => setId(e.target.value)} placeholder="e.g. 3" inputMode="numeric" onKeyDown={(e) => e.key === 'Enter' && build()} />
-        </Field>
-        <Button variant="primary" disabled={!id.trim()} onClick={build}>Draw up the certificate</Button>
-      </Panel>
+  const body = (
+    <>
+      {pinned ? null : (
+        <Panel style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 'var(--gap)', alignItems: 'end' }}>
+          <Field label="Finding — the ledger entry it rests on">
+            <Input value={id} onChange={(e) => setId(e.target.value)} placeholder="e.g. 3" inputMode="numeric" onKeyDown={(e) => e.key === 'Enter' && build()} />
+          </Field>
+          <Button variant="primary" disabled={!id.trim()} onClick={() => build()}>Draw up the certificate</Button>
+        </Panel>
+      )}
 
       {cert.status === 'loading' ? (
         <Panel><Loading steps={['gathering the ledger entry', 'chaining it to the witnessed head', 'collecting witness co-signatures', 'sealing the bundle']} activeStep={2} /></Panel>
       ) : cert.status === 'error' ? (
         <ErrorState error={cert.error} onRetry={cert.retry} />
       ) : cert.status === 'success' ? (
-        <Certificate bundle={cert.data?.json} note={cert.data?.note} />
-      ) : (
+        <div className="lb-fade"><Certificate bundle={cert.data?.json} note={cert.data?.note} /></div>
+      ) : pinned ? null : (
         <Panel style={{ color: 'var(--ink-faint)', fontSize: 14, lineHeight: 1.55, maxWidth: 560 }}>
-          In the live flow this is launched straight from an open receipt or a trace result — the finding
-          id is carried in. Here, name the ledger entry you want certified.
+          Name the ledger entry you want certified. In the live flow this is launched straight from an open receipt or a trace result.
         </Panel>
       )}
+    </>
+  )
+
+  if (pinned) {
+    return <div style={{ display: 'grid', gap: 'calc(var(--gap) * 1.5)' }}>{body}</div>
+  }
+
+  return (
+    <Workspace max={960}>
+      <PageHead
+        title="Pramāṇapatra"
+        sub="The evidence bundle for one finding. An independent verifier checks the JSON; this page only renders its face."
+      />
+      <div style={{ display: 'grid', gap: 'calc(var(--gap) * 1.5)' }}>{body}</div>
+    </Workspace>
+  )
+}
+
+/**
+ * The in-flow entry point: a quiet button beside a finding that unfolds its
+ * certificate inline (design plan §11 — "pulled from any open or trace result").
+ */
+export function CertificateLauncher({ findingId }) {
+  const [open, setOpen] = useState(false)
+  if (findingId == null) return null
+  if (!open) {
+    return <Button variant="quiet" onClick={() => setOpen(true)}>Draw up the certificate →</Button>
+  }
+  return (
+    <div style={{ borderTop: '1px solid var(--hairline)', paddingTop: 'var(--gap)' }}>
+      <Pramanapatra findingId={findingId} />
     </div>
   )
 }
@@ -82,7 +112,7 @@ function Certificate({ bundle, note }) {
     <div style={{ border: '1px solid var(--hairline)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
       <ClassificationBanner level={req.classification || 'UNCLASSIFIED'} position="top" />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'auto minmax(0,1fr)', gap: 'calc(var(--gap) * 1.5)', padding: 'calc(var(--gap) * 1.5)', alignItems: 'center' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'auto minmax(0,1fr)', gap: 'calc(var(--gap) * 2)', padding: 'calc(var(--gap) * 2)', alignItems: 'center' }}>
         <div style={{ display: 'grid', placeItems: 'center', gap: 8 }}>
           <WitnessRing scale="widget" data={{ witnesses: Object.keys(bundle.witness_pubs || {}).length || 3 }} highlightLeaf={entry.index} />
           <span style={{ ...mono, fontSize: 10, color: 'var(--ink-faint)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>witnessed seal</span>
@@ -95,26 +125,25 @@ function Certificate({ bundle, note }) {
             document <strong style={{ ...mono }}>{req.doc_id || '—'}</strong>
             {req.timestamp ? <> at <span style={{ ...mono }}>{req.timestamp}</span></> : null}.
           </p>
-          <p style={{ margin: '10px 0 0', fontSize: 13, color: 'var(--ink-muted)', lineHeight: 1.5 }}>
-            This is a statement the recipient's own key signed — not a claim by the authority. What it proves,
-            and what it does not, is set out below.
+          <p style={{ margin: '12px 0 0', fontSize: 13, color: 'var(--ink-muted)', lineHeight: 1.5 }}>
+            A statement the recipient's own key signed — not a claim by the authority.
           </p>
         </div>
       </div>
 
-      <div className="lb-noprint" style={{ display: 'flex', gap: 8, padding: '10px calc(var(--gap) * 1.5)', borderTop: '1px solid var(--hairline)', borderBottom: '1px solid var(--hairline)' }}>
+      <div className="lb-noprint" style={{ display: 'flex', gap: 8, padding: 'var(--gap) calc(var(--gap) * 2)', borderTop: '1px solid var(--hairline)', borderBottom: '1px solid var(--hairline)' }}>
         <Button variant="primary" onClick={downloadJson}>Download the JSON bundle</Button>
         <Button variant="quiet" onClick={() => window.print()}>Print / save as PDF</Button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,340px)', gap: 'calc(var(--gap) * 1.5)', padding: 'calc(var(--gap) * 1.5)', alignItems: 'start' }}>
-        <div style={{ display: 'grid', gap: 'var(--gap)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,320px)', gap: 'calc(var(--gap) * 2)', padding: 'calc(var(--gap) * 2)', alignItems: 'start' }}>
+        <div style={{ display: 'grid', gap: 'calc(var(--gap) * 1.25)' }}>
           <Contents entry={entry} head={head} bundle={bundle} />
           <Caveat kind="proves-key" />
         </div>
         <div style={{ display: 'grid', gap: 'var(--gap)' }} className="lb-noprint">
           <PresentNotVerified />
-          {note ? <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-muted)', lineHeight: 1.5 }}>{note}</p> : null}
+          {note ? <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-faint)', lineHeight: 1.5 }}>{note}</p> : null}
         </div>
       </div>
     </div>
@@ -132,17 +161,17 @@ function Contents({ entry, head, bundle }) {
     ['recipient key', shortHash(entry.recipient_pub, 10, 6)],
   ]
   return (
-    <Panel>
-      <div style={{ ...mono, fontSize: 11, color: 'var(--ink-muted)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>what the bundle carries</div>
-      <div style={{ display: 'grid', gap: 4 }}>
+    <div>
+      <div style={{ ...mono, fontSize: 11, color: 'var(--ink-muted)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 12 }}>what the bundle carries</div>
+      <div style={{ display: 'grid', gap: 2 }}>
         {items.map(([k, v]) => (
-          <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 13, padding: '3px 0' }}>
+          <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 13, padding: '7px 0', borderBottom: '1px solid var(--hairline)' }}>
             <span style={{ color: 'var(--ink-muted)' }}>{k}</span>
             <span style={{ ...mono, fontSize: 12, textAlign: 'right' }}>{v}</span>
           </div>
         ))}
       </div>
-    </Panel>
+    </div>
   )
 }
 

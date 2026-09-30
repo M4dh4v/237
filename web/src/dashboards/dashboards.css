@@ -99,3 +99,20 @@
   body { background: #fff; }
 }
 .lb-print-only { display: none; }
+
+/* disclosure: a quiet native expander for secondary detail */
+.lb-disclosure {
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  padding: calc(var(--gap) * 1.5);
+}
+.lb-disclosure > summary::-webkit-details-marker { display: none; }
+.lb-disclosure > summary { position: relative; padding-left: 18px !important; }
+.lb-disclosure > summary::before {
+  content: '+';
+  position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  color: var(--ink-faint);
+}
+.lb-disclosure[open] > summary::before { content: '−'; }
+.lb-disclosure > summary:hover { color: var(--ink); }

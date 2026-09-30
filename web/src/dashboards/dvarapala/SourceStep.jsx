@@ -26,9 +26,9 @@ export default function SourceStep({ source, onSource, onNext }) {
       <div>
         <SectionHead
           title="Choose what to seal"
-          sub="Drop a file, pick from the corpus, or write one here. Every path becomes the same sealable document body."
+          sub="Any path becomes the same sealable document body."
         />
-        <div style={{ marginTop: 'var(--gap)' }}>
+        <div style={{ marginTop: 'calc(var(--gap) * 1.25)' }}>
           <Tabs tabs={TABS} active={tab} onChange={setTab} />
           <div style={{ paddingTop: 'var(--gap)' }}>
             {tab === 'corpus' && <CorpusPicker source={source} onSource={onSource} />}
@@ -190,7 +190,7 @@ function PreviewPane({ source, tab, onNext }) {
       <div style={{ fontSize: 12, color: 'var(--ink-muted)', marginBottom: 'var(--gap)', letterSpacing: '0.04em', textTransform: 'uppercase', ...mono }}>preview</div>
       {!source ? (
         <div style={{ color: 'var(--ink-faint)', fontSize: 13, lineHeight: 1.5 }}>
-          Nothing chosen yet. Pick a source on the left and it appears here with its watermark capacity.
+          Pick a source — it appears here with its watermark capacity.
         </div>
       ) : (
         <div style={{ display: 'grid', gap: 'var(--gap)' }}>

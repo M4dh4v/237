@@ -14,7 +14,50 @@ export const shortHash = (h, head = 6, tail = 4) => {
 
 export const mono = { fontFamily: 'var(--font-mono)' }
 
-export function Panel({ children, pad = 1.25, style, className = '', ...rest }) {
+/**
+ * The centered workspace. Every dashboard mounts inside one so content sits in a
+ * measured column instead of flung to the screen edges over a dead void. Max
+ * width keeps the reading/scan distance sane on wide displays; generous page
+ * padding gives the whole surface room to breathe.
+ */
+export function Workspace({ max = 1200, children, style, className = '', center = false }) {
+  return (
+    <div
+      className={className}
+      style={{
+        width: '100%', maxWidth: max, margin: '0 auto', padding: 'calc(var(--gap) * 2)',
+        ...(center ? { minHeight: 'calc(100dvh - var(--strip-h))', display: 'flex', flexDirection: 'column', justifyContent: 'center' } : null),
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
+/** One title, one short line. The text diet lives here — no paragraph blurbs. */
+export function PageHead({ title, sub, aside }) {
+  return (
+    <header style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 'var(--gap)', marginBottom: 'calc(var(--gap) * 1.75)' }}>
+      <div style={{ minWidth: 0 }}>
+        <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 22, margin: 0, lineHeight: 1.1 }}>{title}</h2>
+        {sub ? <p style={{ color: 'var(--ink-muted)', margin: '5px 0 0', fontSize: 13, lineHeight: 1.4 }}>{sub}</p> : null}
+      </div>
+      {aside ? <div style={{ flex: '0 0 auto' }}>{aside}</div> : null}
+    </header>
+  )
+}
+
+/** A quiet uppercase-mono zone label — names a region without a heading's weight. */
+export function ZoneLabel({ children, style }) {
+  return (
+    <div style={{ ...mono, fontSize: 11, color: 'var(--ink-muted)', letterSpacing: '0.08em', textTransform: 'uppercase', ...style }}>
+      {children}
+    </div>
+  )
+}
+
+export function Panel({ children, pad = 1.5, style, className = '', ...rest }) {
   return (
     <div
       className={className}

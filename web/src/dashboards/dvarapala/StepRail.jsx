@@ -23,8 +23,7 @@ export default function StepRail({ current, reached, onGo }) {
         display: 'flex',
         flexDirection: 'column',
         gap: 4,
-        width: 'var(--rail-w)',
-        flex: '0 0 var(--rail-w)',
+        width: '100%',
       }}
     >
       <div style={{ padding: '0 6px 10px', borderBottom: '1px solid var(--hairline)', marginBottom: 6 }}>

@@ -23,6 +23,7 @@ even on a code path a test would not happen to execute.
 from __future__ import annotations
 
 import ast
+import os
 import subprocess
 import sys
 import textwrap
@@ -188,12 +189,27 @@ def real_bundle(tmp_path_factory):
 def test_verify_runs_with_logfirst_unimportable(real_bundle):
     """The real check: a subprocess where importing logfirst raises."""
     import json
+    import site
 
+    # The child runs with a clean HOME, so it cannot rely on the per-user site
+    # to find its own dependencies (oqs, cryptography). We pass the real
+    # interpreter's site directories on PYTHONPATH explicitly, so the verifier's
+    # legitimate deps resolve wherever they were installed -- venv, system, or
+    # `pip --user`/`--break-system-packages`. logfirst being reachable on the
+    # path too is fine and deliberate: independence is enforced by the meta-path
+    # hook that raises on any logfirst import, not by hiding it.
+    pythonpath = os.pathsep.join(
+        [str(REPO), *site.getsitepackages(), site.getusersitepackages()]
+    )
     proc = subprocess.run(
         [sys.executable, "-c", CHILD, real_bundle],
         cwd=str(REPO), capture_output=True, text=True, timeout=300,
-        env={"PYTHONPATH": str(REPO), "PATH": "/usr/bin:/bin",
-             "LD_LIBRARY_PATH": "/home/madhav/_oqs/lib64",
+        env={"PYTHONPATH": pythonpath, "PATH": "/usr/bin:/bin",
+             # liboqs must be loadable by the subprocess. Inherit the ambient
+             # path when set, else fall back to the conventional local build
+             # ($HOME/_oqs/lib). Never a hardcoded per-developer absolute path.
+             "LD_LIBRARY_PATH": os.environ.get("LD_LIBRARY_PATH")
+                 or os.path.expanduser("~/_oqs/lib"),
              "HOME": "/tmp"})
     assert proc.returncode == 0, (
         f"child failed:\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}")

@@ -119,6 +119,43 @@ def _b64_image(data: str) -> bytes:
 _IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tif", ".tiff", ".webp")
 _TEXT_EXTS = (".txt", ".md", ".markdown", ".text", ".csv", ".log")
 
+# Tesseract reads text best at ~300 DPI with a tall, high-contrast glyph. A
+# screenshot is ~96 DPI and its text is often 12-16px, which is where the merge/
+# split errors this pipeline has to absorb come from. Upscaling to this width
+# before OCR is the single biggest quality win and costs nothing downstream.
+# ponytail: fixed target width, 3x cap. Expose via env if a deployment scans
+# images of wildly different sizes.
+_OCR_TARGET_WIDTH = 2000
+_OCR_MAX_SCALE = 3.0
+
+
+def _prep_for_ocr(img):
+    """Grayscale + upscale a screenshot so OCR reads it cleanly.
+
+    A pure pixel funnel in front of the *unchanged* OCR path -- it changes how
+    the image is read, never what the watermark or ledger do with the text. The
+    same characters come out, just more of them correct: a legibly-sized,
+    high-contrast glyph is segmented far more reliably, so fewer carrier slots
+    are lost to word merges.
+    """
+    from PIL import Image, ImageOps
+
+    img = img.convert("L")  # tesseract binarises internally; give it clean gray
+    if img.width < _OCR_TARGET_WIDTH:
+        scale = min(_OCR_MAX_SCALE, _OCR_TARGET_WIDTH / img.width)
+        img = img.resize((round(img.width * scale), round(img.height * scale)),
+                         Image.LANCZOS)
+    return ImageOps.autocontrast(img)
+
+
+def _ocr_image(data: bytes) -> str:
+    """Decode image bytes, prep them, and OCR via the unchanged watermark path."""
+    from ..watermark import ocr
+    try:
+        return ocr.image_to_text(_prep_for_ocr(ocr.bytes_to_image(data)))
+    except Exception as e:                             # OCRError / PIL decode
+        raise HTTPException(400, f"could not read the image: {e}") from e
+
 
 def _extract_document(filename: str, content_type: str | None,
                       data: bytes) -> tuple[str, list[dict]]:
@@ -174,11 +211,7 @@ def _extract_document(filename: str, content_type: str | None,
         return "\n\n".join(parts), pages
 
     if is_image:
-        from ..watermark import ocr
-        try:
-            text = ocr.image_to_text(ocr.bytes_to_image(data))
-        except Exception as e:                         # OCRError / PIL decode
-            raise HTTPException(400, f"could not read the image: {e}") from e
+        text = _ocr_image(data)
         return text, [{"page": 1, "extraction": "ocr", "chars": len(text)}]
 
     # Text, markdown, or anything we can decode. `is_text` is a hint; a file with
@@ -483,13 +516,25 @@ def register_demo_routes(app, scenario) -> None:
     def leakcheck(body: CheckBody):
         """Run the leak-check pipeline and return the result unsummarised."""
         text = body.text or ""
-        image = _b64_image(body.image_b64) if body.image_b64 else None
-        if not text.strip() and image is None:
+        ocr_text = None
+        if body.image_b64:
+            # OCR here in the glue -- with the screenshot prep -- rather than
+            # handing raw bytes to investigate(), so the prep applies to pasted
+            # and dropped images too, not only uploads. investigate() then runs
+            # on text exactly as it does for a pasted passage; its own module
+            # stays untouched.
+            ocr_text = _ocr_image(_b64_image(body.image_b64))
+            text = ocr_text
+        if not text.strip():
             raise HTTPException(400, "nothing to check: pass text or image_b64")
-        inv = scenario.investigator().investigate(leaked_text=text,
-                                                  image_bytes=image)
+        inv = scenario.investigator().investigate(leaked_text=text)
         result = inv.as_dict()
         result["simulated"] = list(SIMULATED)
+        if ocr_text is not None:
+            # What OCR actually read, so the analyst can see why a mark did or
+            # did not survive. Word order is not preserved (see watermark/ocr.py)
+            # -- labelled as read-text, never presented as the verbatim leak.
+            result["ocr_text"] = ocr_text
         if body.note:
             # Recorded, never acted on. An analyst's hunch is not evidence, and
             # letting it steer the pipeline would make the output an opinion.

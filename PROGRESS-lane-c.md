@@ -46,29 +46,40 @@ leakcheck/upload identifies + reports pages, certificate bundle passes
 - **Do-not-touch modules byte-for-byte unchanged:**
   `git diff --stat -- logfirst/crypto logfirst/ledger logfirst/witness
   logfirst/watermark logfirst/forensics verifier` → empty.
-- **My 10 tests pass.** Full suite minus two pre-existing environment failures:
-  `508 passed, 4 skipped`.
+- **My 10 tests pass.** Full suite: `510 passed, 4 skipped`, with the only
+  15 failures + 3 errors all from one missing system package (below).
 - **Frontend build passes** (`cd web && npm run build`) with the rewritten
   `api.js`.
 - File handling stays local; no outbound calls.
 
-### Pre-existing environment failures (NOT caused by Lane C)
-1. `tests/test_ocr_harness.py` (+ the screenshot route test and
-   `test_generate::test_verify_recovers_the_truth_from_the_artefacts`) fail
-   because this machine has **no `eng.traineddata`** for tesseract
-   (`/usr/share/tessdata/` has `afr`/`osd` only). Fix: install the English
-   language pack (Arch: `sudo pacman -S tesseract-data-eng`).
-2. `tests/test_verifier_independence.py::test_verify_runs_with_logfirst_unimportable`
-   fails on a **hardcoded `LD_LIBRARY_PATH: /home/madhav/_oqs/lib64`** (line 196)
-   — a machine-specific path committed for a different developer; this box has
-   liboqs at `/home/void/_oqs/lib`.
+### Only remaining failures — missing tesseract English data (one command)
+Every failure/error left in the suite is OCR: `tests/test_ocr_harness.py`, the
+screenshot route test, and `test_generate::test_verify_recovers_the_truth...`.
+Cause: this box has no `eng.traineddata` (only `afr`/`osd` in
+`/usr/share/tessdata/`). Fix, once, with root:
 
-Both are unrelated to the glue and untouched by this lane.
+```
+sudo pacman -S tesseract-data-eng
+```
 
-## Environment note (this machine)
-No `.venv` was present and system Python lacked the deps, so they were installed
-with `pip --break-system-packages` (Arch PEP 668): the full `requirements.txt`
-plus `pypdf`/`python-multipart`, and `liboqs-python` was built from source
-(needed a `cmake` wheel). The normal path is `make bootstrap` into `.venv`.
+Nothing in the code can supply this offline — it is a system language pack. The
+serve path and everything non-OCR run without it.
+
+## Environment hardening (venv-free, permanent)
+Recurring "no venv / missing library" startup pain is fixed at the source:
+- **`Makefile`** — `PY`/`PIP`/`PYTEST` now default to the system `python`/`pip`/
+  `python -m pytest` (was `.venv/bin/*`); `bootstrap` installs directly with
+  `pip install --break-system-packages -e ".[...]"` (no `.venv`); `OQS_LIB`
+  defaults to `$(HOME)/_oqs/lib` (was a hardcoded other-developer path).
+- **`run.sh`** (new, repo root) — one command, cwd-independent:
+  `./run.sh` serves API+console, `./run.sh setup` installs deps once. Fails
+  fast with a fix message if deps are absent; warns (not blocks) when tesseract
+  English data is missing.
+- **`tests/test_verifier_independence.py`** — replaced the hardcoded
+  `/home/madhav/_oqs/lib64` with an ambient-or-`$HOME/_oqs/lib` `LD_LIBRARY_PATH`
+  and put the interpreter's real site directories on the child's `PYTHONPATH`,
+  so the isolation subprocess finds `oqs` regardless of a reset `HOME`
+  (the venv-less `pip --user` layout). This test now passes. Verifier
+  independence is still enforced by the meta-path import hook, unchanged.
 
 **Not committed — awaiting human commit.**

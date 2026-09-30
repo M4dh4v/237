@@ -48,11 +48,11 @@ button { font-family: inherit; }
 
 .shell__body { flex: 1 1 auto; min-height: 0; }
 
-/* a plain full-bleed stage for routes that are not the landing */
+/* a full-bleed stage for routes that are not the landing; each dashboard's
+   own Workspace owns its width, padding, and centering so screens can either
+   fill the viewport (Dvārapāla, Sūchī) or sit in a measured column (Anveṣaṇa). */
 .stage {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: calc(var(--gap) * 2) var(--gap);
+  min-height: 0;
 }
 
 /* the placeholder look for stub surfaces — quiet, not shouty */

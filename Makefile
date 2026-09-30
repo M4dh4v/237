@@ -12,9 +12,12 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-PY      ?= .venv/bin/python
-PIP     ?= .venv/bin/pip
-PYTEST  ?= .venv/bin/pytest
+# No venv. Deps are installed straight into the system/user interpreter (see
+# `make bootstrap`), so every target runs against plain `python`. Override any
+# of these on the command line if you do want a venv: `make test PY=.venv/bin/python`.
+PY      ?= python
+PIP     ?= pip
+PYTEST  ?= python -m pytest
 
 DATA    ?= /tmp/logfirst-demo
 TAMPER  ?= /tmp/logfirst-tamper
@@ -26,7 +29,7 @@ WORDS   ?= 1800
 # signatures, and without it the failure looks like a failed verification
 # rather than a missing dependency -- which is the worst possible way for this
 # particular tool to fail. Export it for everything that shells out.
-OQS_LIB ?= /home/madhav/_oqs/lib64
+OQS_LIB ?= $(HOME)/_oqs/lib
 export LD_LIBRARY_PATH := $(OQS_LIB):$(LD_LIBRARY_PATH)
 
 .PHONY: help bootstrap check-liboqs check-tesseract demo demo-scripted demo-serve \
@@ -35,7 +38,7 @@ export LD_LIBRARY_PATH := $(OQS_LIB):$(LD_LIBRARY_PATH)
 help:
 	@echo "logfirst"
 	@echo
-	@echo "  make bootstrap      create .venv, install deps, check liboqs and tesseract"
+	@echo "  make bootstrap      install deps into the current python, check liboqs and tesseract"
 	@echo "  make demo           the eight-step scripted walkthrough, with failures"
 	@echo "  make demo-serve     serve the API and the console together (see below)"
 	@echo "  make tamper         tamper with a committed entry; watch every check catch it"
@@ -50,13 +53,12 @@ help:
 # bootstrap
 # ---------------------------------------------------------------------------
 
-bootstrap: .venv/bin/python
-	$(PIP) install -q -e ".[service,forensics,ocr,qr,dev]"
+# Direct install into the current interpreter -- no venv. `--break-system-packages`
+# is what a PEP-668 "externally-managed" distro (Arch, recent Debian/Ubuntu) needs
+# to allow this; it is a no-op on distros that don't mark themselves managed.
+bootstrap:
+	$(PIP) install -q --break-system-packages -e ".[service,forensics,ocr,qr,dev]"
 	@$(PY) scripts/check_env.py
-
-.venv/bin/python:
-	python3 -m venv .venv
-	$(PIP) install -q --upgrade pip
 
 # liboqs is the one dependency that cannot be installed from PyPI, and the one
 # whose absence produces a *misleading* failure: the Python binding imports

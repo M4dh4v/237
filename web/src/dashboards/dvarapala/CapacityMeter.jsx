@@ -38,7 +38,7 @@ export default function CapacityMeter({ capacity, showCaveat = false }) {
           overflow: 'hidden',
         }}
       >
-        <div style={{ width: `${ratio * 100}%`, height: '100%', background: barColor, transition: 'width var(--dur-slow) var(--ease-out)' }} />
+        <div style={{ width: '100%', height: '100%', background: barColor, transformOrigin: 'left', transform: `scaleX(${ratio})`, transition: 'transform var(--dur-slow) var(--ease-out)' }} />
       </div>
       <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--ink-muted)', lineHeight: 1.45 }}>
         {ample

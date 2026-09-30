@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { api } from '@/api.js'
 import { useAsync } from './_shared/useAsync.jsx'
 import { Async, Empty } from './_shared/Async.jsx'
-import { Panel, Pill, mono } from './_shared/ui.jsx'
+import { Pill, mono, Workspace, Panel, ZoneLabel } from './_shared/ui.jsx'
 import Identity from './suchi/Identity.jsx'
 import OpenFlow from './suchi/OpenFlow.jsx'
 import './dashboards.css'
@@ -11,36 +11,39 @@ import './dashboards.css'
  * Sūchī — the register (design plan §8). The recipient's side: the documents
  * addressed to you, opened one at a time. Opening is the single consequential
  * act — it appends a ledger entry and releases an ephemeral key — so the inbox
- * stays quiet and the open surface carries all the weight (the gate ring, the
- * marked copy, the receipt that is the same event as the ledger leaf).
- *
- * Identity here is a demo convenience: a real deployment binds it to a
- * credential. The chip says so plainly.
+ * stays quiet on the left and the reading surface on the right carries all the
+ * weight: the gate ring, then the marked copy at full size, then the receipt
+ * that is the same event as the ledger leaf.
  */
 export default function Suchi() {
   const [me, setMe] = useState(null)
   const [openDoc, setOpenDoc] = useState(null)
 
   return (
-    <div>
-      <div style={{ padding: 'calc(var(--gap) * 1.5) calc(var(--gap) * 1.5) 0' }}>
-        <Identity me={me} onMe={(r) => { setMe(r); setOpenDoc(null) }} />
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 360px) minmax(0, 1fr)', gap: 'calc(var(--gap) * 1.5)', padding: 'calc(var(--gap) * 1.5)', alignItems: 'start' }}>
-        <Inbox me={me} openDoc={openDoc} onOpen={setOpenDoc} />
-        {me && openDoc ? (
-          <OpenFlow key={openDoc.doc_id} me={me} doc={openDoc} />
-        ) : (
-          <Panel style={{ minHeight: 320, display: 'grid', placeItems: 'center', textAlign: 'center' }}>
-            <div style={{ color: 'var(--ink-faint)', fontSize: 14, maxWidth: 360, lineHeight: 1.5 }}>
-              {me
-                ? 'Choose a document on the left. Opening it is the act that writes the ledger — nothing is recorded until you do.'
-                : 'Select who you are to see the documents addressed to you.'}
+    <Workspace max={2400} style={{ height: 'calc(100dvh - var(--strip-h))', display: 'flex', flexDirection: 'column', padding: 'var(--gap)' }}>
+      <Panel pad={0} style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'stretch', overflow: 'hidden' }}>
+        <div style={{ width: 340, flex: '0 0 340px', borderRight: '1px solid var(--hairline)', padding: 'calc(var(--gap) * 1.5)', display: 'flex', flexDirection: 'column', gap: 'calc(var(--gap) * 1.5)', minHeight: 0 }}>
+          <Identity me={me} onMe={(r) => { setMe(r); setOpenDoc(null) }} />
+          <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }} className="lb-scroll">
+            <Inbox me={me} openDoc={openDoc} onOpen={setOpenDoc} />
+          </div>
+        </div>
+
+        <main style={{ flex: 1, minWidth: 0, padding: 'calc(var(--gap) * 2)', overflow: 'auto' }} className="lb-scroll">
+          {me && openDoc ? (
+            <OpenFlow key={openDoc.doc_id} me={me} doc={openDoc} />
+          ) : (
+            <div style={{ height: '100%', minHeight: 320, display: 'grid', placeItems: 'center', textAlign: 'center' }}>
+              <div style={{ color: 'var(--ink-faint)', fontSize: 14, maxWidth: 360, lineHeight: 1.5 }}>
+                {me
+                  ? 'Choose a document on the left. Opening it is the act that writes the ledger — nothing is recorded until you do.'
+                  : 'Select who you are to see the documents addressed to you.'}
+              </div>
             </div>
-          </Panel>
-        )}
-      </div>
-    </div>
+          )}
+        </main>
+      </Panel>
+    </Workspace>
   )
 }
 
@@ -66,13 +69,13 @@ function Inbox({ me, openDoc, onOpen }) {
   }, [state.data, me])
 
   if (!me) {
-    return <Panel style={{ color: 'var(--ink-faint)', fontSize: 13 }}>No identity selected.</Panel>
+    return <div style={{ color: 'var(--ink-faint)', fontSize: 13 }}>No identity selected.</div>
   }
 
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 'var(--gap)' }}>
-        <div style={{ ...mono, fontSize: 11, color: 'var(--ink-muted)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>addressed to you</div>
+        <ZoneLabel>addressed to you</ZoneLabel>
         <span style={{ ...mono, fontSize: 11, color: 'var(--ink-faint)' }}>{mine.length}</span>
       </div>
       <Async

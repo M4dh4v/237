@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { api } from '@/api.js'
 import { WitnessRing } from '@/components'
 import { useAsync } from './_shared/useAsync.jsx'
-import { mono } from './_shared/ui.jsx'
+import { mono, Workspace, Panel } from './_shared/ui.jsx'
 import StepRail, { STEPS } from './dvarapala/StepRail.jsx'
 import SourceStep from './dvarapala/SourceStep.jsx'
 import RecipientStep from './dvarapala/RecipientStep.jsx'
@@ -35,33 +35,36 @@ export default function Dvarapala() {
   const restart = () => { setSource(null); setRecipients([]); setLevel('UNCLASSIFIED'); setReached(new Set(['source'])); setStep('source') }
 
   return (
-    <div style={{ display: 'flex', gap: 'calc(var(--gap) * 1.5)', padding: 'calc(var(--gap) * 1.5)', alignItems: 'flex-start' }}>
-      <StepRail current={step} reached={reached} onGo={go} />
+    <Workspace max={2400} style={{ height: 'calc(100dvh - var(--strip-h))', display: 'flex', flexDirection: 'column', padding: 'var(--gap)' }}>
+      <Panel pad={0} style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'stretch', overflow: 'hidden' }}>
+        <div style={{ width: 'var(--rail-w)', flex: '0 0 var(--rail-w)', borderRight: '1px solid var(--hairline)', padding: 'calc(var(--gap) * 1.5)', display: 'flex', flexDirection: 'column', gap: 'calc(var(--gap) * 1.5)', minHeight: 0 }}>
+          <StepRail current={step} reached={reached} onGo={go} />
+          <div style={{ marginTop: 'auto' }}><LedgerPulse /></div>
+        </div>
 
-      <main className="lb-fade" key={step} style={{ flex: 1, minWidth: 0 }}>
-        {step === 'source' && (
-          <SourceStep source={source} onSource={(s) => { setSource(s); setReached((r) => new Set(r).add('recipients')) }} onNext={advance} />
-        )}
-        {step === 'recipients' && (
-          <RecipientStep selected={recipients} onSelected={setRecipients} onNext={advance} onBack={back} />
-        )}
-        {step === 'classification' && (
-          <ClassifyStep level={level} onLevel={setLevel} onNext={advance} onBack={back} />
-        )}
-        {step === 'seal' && (
-          <SealStep source={source} recipients={recipients} level={level} onBack={source && recipients.length ? back : restart} />
-        )}
-      </main>
-
-      <LedgerPulse />
-    </div>
+        <main className="lb-fade lb-scroll" key={step} style={{ flex: 1, minWidth: 0, padding: 'calc(var(--gap) * 2)', overflow: 'auto' }}>
+          {step === 'source' && (
+            <SourceStep source={source} onSource={(s) => { setSource(s); setReached((r) => new Set(r).add('recipients')) }} onNext={advance} />
+          )}
+          {step === 'recipients' && (
+            <RecipientStep selected={recipients} onSelected={setRecipients} onNext={advance} onBack={back} />
+          )}
+          {step === 'classification' && (
+            <ClassifyStep level={level} onLevel={setLevel} onNext={advance} onBack={back} />
+          )}
+          {step === 'seal' && (
+            <SealStep source={source} recipients={recipients} level={level} onBack={source && recipients.length ? back : restart} />
+          )}
+        </main>
+      </Panel>
+    </Workspace>
   )
 }
 
 /**
- * The right rail: the live witnessed ledger, at strip scale. Sealing writes
- * nothing here (the gate is honest — the record grows only when a recipient
- * opens), so this is context, not a progress bar: it is the book the seal will
+ * The witnessed ledger, docked under the step rail as compact context (not a
+ * floating fourth column). Sealing writes nothing here — the gate is honest: the
+ * record grows only when a recipient opens — so this is the book the seal will
  * one day be recorded in, held by many witnesses at once.
  */
 function LedgerPulse() {
@@ -76,18 +79,14 @@ function LedgerPulse() {
   }, [head.data])
 
   return (
-    <aside style={{ width: 200, flex: '0 0 200px', position: 'sticky', top: 'calc(var(--gap) * 1.5)' }}>
-      <div style={{ ...mono, fontSize: 11, color: 'var(--ink-muted)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>the ledger</div>
-      <div style={{ border: '1px solid var(--hairline)', borderRadius: 'var(--radius)', background: 'var(--bg-panel)', padding: 'var(--gap)', display: 'grid', gap: 10, placeItems: 'center' }}>
-        {data ? <WitnessRing scale="strip" data={data} /> : <div style={{ width: 48, height: 48 }} />}
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ ...mono, fontSize: 20, color: 'var(--ink)' }}>{data ? data.leaves : '—'}</div>
-          <div style={{ fontSize: 11, color: 'var(--ink-faint)' }}>leaves recorded</div>
+    <aside style={{ border: '1px solid var(--hairline)', borderRadius: 'var(--radius)', background: 'var(--bg-panel)', padding: 'var(--gap)', display: 'flex', alignItems: 'center', gap: 12 }}>
+      {data ? <WitnessRing scale="strip" data={data} /> : <div style={{ width: 44, height: 44, flex: '0 0 44px' }} />}
+      <div style={{ minWidth: 0 }}>
+        <div style={{ ...mono, fontSize: 18, color: 'var(--ink)', lineHeight: 1 }}>{data ? data.leaves : '—'}</div>
+        <div style={{ fontSize: 11, color: 'var(--ink-faint)', marginTop: 3 }}>
+          leaves recorded{data ? ` · ${data.witnesses} witnesses` : ''}
         </div>
       </div>
-      <p style={{ margin: '10px 0 0', fontSize: 11, color: 'var(--ink-faint)', lineHeight: 1.45 }}>
-        {data ? `${data.witnesses} witnesses co-sign this record.` : ''} Sealing adds nothing here — the ledger grows only when a copy is opened.
-      </p>
     </aside>
   )
 }

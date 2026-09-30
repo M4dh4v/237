@@ -4,6 +4,7 @@ import { WitnessRing, FailClosed, PresentNotVerified, Caveat, ClassificationBann
 import { useAsync } from '../_shared/useAsync.jsx'
 import { Loading, ErrorState } from '../_shared/Async.jsx'
 import { Button, Panel, Pill, mono, shortHash } from '../_shared/ui.jsx'
+import { CertificateLauncher } from '../Pramanapatra.jsx'
 
 /**
  * The open surface (design plan §8.2). Opening is the one consequential act:
@@ -64,40 +65,73 @@ function Opened({ data, doc }) {
   const entry = data.ledger_entry || {}
   const [copied, setCopied] = useState(false)
 
+  // Format-aware original. Lane C flag: api.open() returns the marked text only —
+  // when it also returns the original bytes (image_data_url / pdf_data_url), the
+  // viewer lights up automatically. Until then we render the marked text page.
+  const image = data.image_data_url
+  const pdf = data.pdf_data_url
+  const kind = image ? 'image' : pdf ? 'pdf' : 'text'
+
   const copy = () => {
     navigator.clipboard?.writeText(marked).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) }).catch(() => {})
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,320px)', gap: 'calc(var(--gap) * 1.5)', alignItems: 'start' }}>
-      <div style={{ border: '1px solid var(--hairline)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
+    <div className="lb-fade" style={{ display: 'grid', gap: 'calc(var(--gap) * 1.25)' }}>
+      {/* The received copy, at full size — the whole point of this screen. */}
+      <div style={{ border: '1px solid var(--hairline)', borderRadius: 'var(--radius)', overflow: 'hidden', background: 'var(--bg)' }}>
         <ClassificationBanner level={doc.classification || 'UNCLASSIFIED'} position="top" />
-        <div style={{ display: 'flex', gap: 8, padding: '8px 12px', borderBottom: '1px solid var(--hairline)', alignItems: 'center' }}>
-          <Button variant="quiet" onClick={copy}>{copied ? 'copied ✓' : 'Copy'}</Button>
-          <Button variant="quiet" onClick={() => window.print()}>Screenshot / print</Button>
-          <label style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--ink-muted)', cursor: 'pointer' }}>
-            <input type="checkbox" checked={showMark} onChange={(e) => setShowMark(e.target.checked)} />
-            reveal the mark ({diff.length})
-          </label>
+        <div style={{ display: 'flex', gap: 8, padding: '10px 14px', borderBottom: '1px solid var(--hairline)', alignItems: 'center' }} className="lb-noprint">
+          <span style={{ ...mono, fontSize: 11, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>your copy · {kind}</span>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+            {kind === 'text' ? (
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--ink-muted)', cursor: 'pointer' }}>
+                <input type="checkbox" checked={showMark} onChange={(e) => setShowMark(e.target.checked)} />
+                reveal the mark ({diff.length})
+              </label>
+            ) : null}
+            <Button variant="quiet" onClick={copy}>{copied ? 'copied ✓' : 'Copy'}</Button>
+            <Button variant="quiet" onClick={() => window.print()}>Screenshot / print</Button>
+          </div>
         </div>
-        <div className="lb-scroll lb-print-only" style={{ maxHeight: 420, overflowY: 'auto', padding: 'calc(var(--gap) * 1.25)', fontSize: 14, lineHeight: 1.7, color: 'var(--ink)', whiteSpace: 'pre-wrap' }}>
-          {showMark ? <MarkedText plain={plain} diff={diff} /> : marked}
+        <DocumentView kind={kind} image={image} pdf={pdf} marked={marked} plain={plain} diff={diff} showMark={showMark} />
+      </div>
+
+      {/* The receipt — a slim strip, because your open IS the ledger leaf. */}
+      <div className="lb-noprint" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--gap)', border: '1px solid var(--hairline)', borderRadius: 'var(--radius)', background: 'var(--bg-panel)', padding: 'var(--gap) calc(var(--gap) * 1.25)' }}>
+        <div style={{ ...mono, fontSize: 11, color: 'var(--ink-muted)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>ledger leaf</div>
+        <KV k="index" v={entry.index != null ? `#${entry.index}` : '—'} />
+        <KV k="leaf hash" v={shortHash(entry.leaf_hash, 12, 8)} mono />
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 'var(--gap)' }}>
+          <PresentNotVerified />
+          {entry.index != null ? <CertificateLauncher findingId={entry.index} /> : null}
         </div>
       </div>
 
-      <div style={{ display: 'grid', gap: 'var(--gap)' }} className="lb-noprint">
-        <Panel>
-          <div style={{ ...mono, fontSize: 11, color: 'var(--ink-muted)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>the ledger entry</div>
-          <p style={{ margin: '0 0 10px', fontSize: 13, color: 'var(--ink-muted)', lineHeight: 1.5 }}>
-            Your open <em>is</em> this leaf. The receipt and the ledger entry are one event, not two.
-          </p>
-          <KV k="index" v={entry.index != null ? `#${entry.index}` : '—'} />
-          <KV k="leaf hash" v={shortHash(entry.leaf_hash, 12, 8)} mono />
-          <div style={{ marginTop: 'var(--gap)' }}><PresentNotVerified /></div>
-        </Panel>
+      <div className="lb-noprint" style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--gap)', alignItems: 'center' }}>
         <Caveat kind="proves-key" />
-        {data.caveat ? <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-muted)', lineHeight: 1.5 }}>{data.caveat}</p> : null}
+        {data.caveat ? <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-muted)', lineHeight: 1.5, flex: 1, minWidth: 200 }}>{data.caveat}</p> : null}
       </div>
+    </div>
+  )
+}
+
+/** The reading surface, sized to fill the stage. Format-aware: an image renders
+ * as an image, a PDF in the browser's own viewer, text as a readable column. */
+function DocumentView({ kind, image, pdf, marked, plain, diff, showMark }) {
+  if (kind === 'image') {
+    return (
+      <div style={{ display: 'grid', placeItems: 'center', padding: 'calc(var(--gap) * 1.5)', background: 'var(--bg)' }}>
+        <img src={image} alt="your marked copy" style={{ maxWidth: '100%', height: 'auto', borderRadius: 2 }} />
+      </div>
+    )
+  }
+  if (kind === 'pdf') {
+    return <iframe src={pdf} title="your marked copy" style={{ width: '100%', height: '68vh', border: 'none', background: 'var(--bg)' }} />
+  }
+  return (
+    <div className="lb-scroll" style={{ minHeight: '52vh', maxHeight: '68vh', overflowY: 'auto', padding: 'calc(var(--gap) * 2)', fontSize: 15, lineHeight: 1.8, color: 'var(--ink)', whiteSpace: 'pre-wrap', maxWidth: 760, margin: '0 auto' }}>
+      {showMark ? <MarkedText plain={plain} diff={diff} /> : marked}
     </div>
   )
 }
@@ -126,7 +160,7 @@ function MarkedText({ plain, diff }) {
 
 function KV({ k, v, mono: isMono }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 13, padding: '3px 0' }}>
+    <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 8, fontSize: 13 }}>
       <span style={{ color: 'var(--ink-muted)' }}>{k}</span>
       <span style={isMono ? mono : undefined}>{v}</span>
     </div>

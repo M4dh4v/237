@@ -1,8 +1,8 @@
 {
   "env": {
-    "ANTHROPIC_AUTH_TOKEN": "sk-6UUeUTZOWbG9Q8Yah7ESeVWbpQPzuTGVuuKgHPAastBRe3bQ",
-    "ANTHROPIC_BASE_URL": "https://api.justwoker.icu",
-    "ANTHROPIC_MODEL": "claude-opus-4-8",
+    "ANTHROPIC_AUTH_TOKEN": "sk-zBrvY21Bv0eZ76tsQ1cYhC3MDotWj6TAadjYjhu7SuPm2xi2",
+    "ANTHROPIC_BASE_URL": "https://agentrouter.org/",
+    "ANTHROPIC_MODEL": "deepseek-v4-flash",
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
   },
   "permissions": {

@@ -40,7 +40,23 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    port: 7891,
+    strictPort: true,
+    proxy,
+  },
+  // `vite preview` serves the built dist/ -- it is what the pm2 deployment
+  // runs, since there is no bundled server for the console. The port is set
+  // explicitly because preview's default (4173) is not server.port; the proxy
+  // is inherited from server.proxy, which is the whole reason the built bundle
+  // still reaches the API on 8443 through same-origin relative URLs.
+  //
+  // host 0.0.0.0 matches what `npm run dev` already binds, so the console is
+  // reachable from other hosts on the network. The API stays bound to
+  // 127.0.0.1:8443 -- the proxy target is server-side, so those API paths are
+  // reachable *through* this server but the backend itself is not exposed.
+  preview: {
+    host: '0.0.0.0',
+    port: 7891,
     strictPort: true,
     proxy,
   },

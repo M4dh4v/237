@@ -1,0 +1,21 @@
+liboqs-python faulthandler is disabled
+   note: tesseract English data absent -> OCR of images is skipped.
+         install once with:  sudo pacman -S tesseract-data-eng
+>> starting backend ...
+>> API  http://127.0.0.1:8443   (up)
+>> UI   http://127.0.0.1:5173   (Ctrl-C stops both)
+
+> logfirst-web@0.1.0 dev
+> vite --host 0.0.0.0
+
+
+  VITE v5.4.21  ready in 341 ms
+
+  ➜  Local:   http://localhost:7891/
+  ➜  Network: http://192.168.0.171:7891/
+  ➜  Network: http://100.83.180.13:7891/
+  ➜  Network: http://172.18.0.1:7891/
+  ➜  Network: http://172.22.0.1:7891/
+  ➜  Network: http://172.20.0.1:7891/
+  ➜  Network: http://172.19.0.1:7891/
+  ➜  Network: http://172.21.0.1:7891/

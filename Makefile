@@ -92,18 +92,19 @@ demo:
 # so. The wire format is the same either way.
 #
 # Two processes, because there is no bundled server for the console: the API
-# binds 8443 and Vite serves the UI on 5173, proxying the API paths to it. The
-# API is backgrounded and killed on exit, so Ctrl-C stops both.
+# binds 8443 and Vite serves the UI on 7891 (vite.config.js server.port),
+# proxying the API paths to it. The API is backgrounded and killed on exit, so
+# Ctrl-C stops both.
 #
 # What this target used to do was build web/dist and then serve the API alone,
 # advertising port 8000 -- which nothing has ever listened on, since the console
-# is Vite on 5173 and the API's default is 8443. The front end was therefore
+# is Vite on 7891 and the API's default is 8443. The front end was therefore
 # unreachable through the only documented command for starting it. (TLS was not
 # the problem: plain HTTP is `demo.py --serve`'s default, and `--tls` is the
 # opt-in.)
 demo-serve:
 	@test -d web/node_modules || (cd web && npm install --silent)
-	@echo "API on 127.0.0.1:8443, console on http://127.0.0.1:5173"
+	@echo "API on 127.0.0.1:8443, console on http://127.0.0.1:7891"
 	@echo "(Ctrl-C stops both.)"
 	@set -e; \
 	 $(PY) scripts/demo.py --serve --data $(DATA) --words $(WORDS) & \

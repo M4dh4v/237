@@ -39,7 +39,9 @@ export default function Dvarapala() {
       <Panel pad={0} style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'stretch', overflow: 'hidden' }}>
         <div style={{ width: 'var(--rail-w)', flex: '0 0 var(--rail-w)', borderRight: '1px solid var(--hairline)', padding: 'calc(var(--gap) * 1.5)', display: 'flex', flexDirection: 'column', gap: 'calc(var(--gap) * 1.5)', minHeight: 0 }}>
           <StepRail current={step} reached={reached} onGo={go} />
-          <div style={{ marginTop: 'auto' }}><LedgerPulse /></div>
+          <div style={{ marginTop: 'auto', display: 'grid', gap: 'var(--gap)' }}>
+            <LedgerPulse />
+          </div>
         </div>
 
         <main className="lb-fade lb-scroll" key={step} style={{ flex: 1, minWidth: 0, padding: 'calc(var(--gap) * 2)', overflow: 'auto' }}>

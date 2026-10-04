@@ -14,6 +14,7 @@ revokes alice cannot pass or fail because of what another test did to carol.
 
 from __future__ import annotations
 
+import os
 import socket
 
 import pytest
@@ -260,7 +261,7 @@ def test_the_admin_routes_do_not_exist_without_a_scenario(tmp_path):
 
     paths = {r.path for r in build_app(auth).routes}
     for path in ("/demo/admin/recipients", "/demo/admin/revoke",
-                 "/demo/admin/reinstate"):
+                 "/demo/admin/reinstate", "/demo/admin/reset"):
         assert path not in paths, f"{path} exists on a run with no scenario"
 
 
@@ -278,3 +279,52 @@ def test_there_is_no_enrolment_route(client):
         assert r.status_code == 404, (
             "there is an enrolment route; certificates are issued offline by "
             "the CA, not by the authority")
+
+
+# ==========================================================================
+# The sandbox reset: an operator action, not an authority capability
+# ==========================================================================
+
+def test_the_reset_refuses_when_nothing_can_restart_the_instance(client):
+    """An unmanaged run must not be killed by a button with no way back.
+
+    `run.sh` and a hand-run `--serve` have no supervisor to bring the process
+    up again, so a reset that stopped the server would simply leave the console
+    dark. The route answers honestly -- "restart me yourself, here is the
+    command" -- rather than performing a stop it cannot undo.
+    """
+    r = client.post("/demo/admin/reset")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["ok"] is False
+    assert body["supervised"] is False
+    assert body["rebuilding"] is False
+    assert "demo.py --serve --fresh" in body["command"]
+    assert "not a capability of the authority" in body["note"], (
+        "the refusal must keep the honesty framing: a demo reset is not an "
+        "authority's power to erase the witnessed record")
+
+
+def test_a_supervised_reset_marks_one_fresh_rebuild_and_asks_to_restart(sc):
+    """The supervised path writes the one-shot sentinel and requests shutdown.
+
+    Two things are asserted, and the second is the one that matters: the
+    sentinel is written so the *next* start rebuilds from seed, and the route
+    did not delete anything itself. `scripts/demo.py` is the only place the
+    scenario is built, and it is where `fresh=True` is applied -- there is no
+    erase path here or anywhere in the ledger module.
+    """
+    app = build_app(sc.authority, scenario=sc)
+    asked = {"n": 0}
+    app.state.sakshya_restart = lambda: asked.__setitem__("n", asked["n"] + 1)
+
+    sentinel = sc.dep.path("RESET_REQUESTED")
+    try:
+        body = TestClient(app).post("/demo/admin/reset").json()
+        assert body["ok"] is True and body["rebuilding"] is True
+        assert os.path.exists(sentinel), (
+            "no sentinel was written; the restart would not rebuild from seed")
+        assert asked["n"] == 1, "shutdown was not requested exactly once"
+    finally:
+        if os.path.exists(sentinel):
+            os.remove(sentinel)

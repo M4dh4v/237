@@ -418,7 +418,9 @@ Dependencies are split in `pyproject.toml` into core + extras (`service`,
 ### Tooling & deployment
 
 - `run.sh` — one command: installs nothing, reaps stale processes, starts the
-  backend + witnesses, waits for `/health`, then starts Vite.
+  backend + witnesses, waits for `/health`, then starts Vite. `./run.sh --clean`
+  additionally wipes the deployment directory and the build caches first, so
+  the run comes back from a freshly built seed.
 - `Makefile` — `bootstrap`, `check-liboqs`, `check-tesseract`, `demo`,
   `demo-serve`, `tamper`, `generate`, `verify`, `test`, `test-fast`,
   `test-crypto`, `test-ledger`, `clean`.
@@ -435,7 +437,10 @@ Dependencies are split in `pyproject.toml` into core + extras (`service`,
 ./run.sh setup          # installs python deps (no venv) + checks the environment
 
 # Every time
-./run.sh                # backend → 127.0.0.1:8443, console → 127.0.0.1:5173
+./run.sh                # backend → 127.0.0.1:8443, console → 127.0.0.1:7891
+
+# Start over: wipe the deployment + caches, rebuild from seed
+./run.sh --clean
 ```
 
 ```bash

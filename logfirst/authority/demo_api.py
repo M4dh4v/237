@@ -39,7 +39,7 @@ import os
 import re
 from datetime import datetime, timezone
 
-from fastapi import File, Form, HTTPException, Response, UploadFile
+from fastapi import File, Form, HTTPException, Request, Response, UploadFile
 from pydantic import BaseModel
 
 from .. import sealed
@@ -652,6 +652,57 @@ def register_demo_routes(app, scenario) -> None:
     @app.post("/demo/admin/reinstate")
     def admin_reinstate(body: RecipientBody):
         return _set_revoked(body.recipient_id, False)
+
+    # -- the demo sandbox reset --------------------------------------------
+    #
+    # The one control that takes the demo back to a clean state. It is NOT an
+    # authority capability and must never read as one: the whole thesis is that
+    # no single administrator can rewrite the witnessed record. What this does
+    # is restart the *operator's own demo instance* from seed -- new keys, fresh
+    # witnesses, an empty ledger. It cannot delete a leaf, and it does not exist
+    # on a production-shaped run (no scenario -> none of this surface at all).
+    #
+    # Mechanism: drop a one-shot sentinel the launcher reads on boot, then ask
+    # the ASGI server to shut down. `serve()`'s own `finally` reaps the witness
+    # processes (a hard exit here would orphan them and leave 9101+ held); the
+    # supervisor restarts the process; the sentinel makes that restart build
+    # `fresh=True`. Nothing on this path touches the ledger module.
+    #
+    # The handle is published by the launcher and is present only when the
+    # process is supervised and can actually be brought back. Without it -- a
+    # foreground `--serve`, or run.sh -- stopping the server would just leave
+    # the console dark, so we refuse and hand over the command instead.
+
+    @app.post("/demo/admin/reset")
+    def admin_reset(request: Request):
+        restart = getattr(request.app.state, "sakshya_restart", None)
+        if restart is None:
+            return {
+                "ok": False, "supervised": False, "rebuilding": False,
+                "command": "python scripts/demo.py --serve --fresh",
+                "note": (
+                    "This instance is not running under a supervisor, so it "
+                    "cannot restart itself. Stop it and start it again with "
+                    "--fresh to reseed the sandbox. This is a reset of the "
+                    "local demo instance, not a capability of the authority: "
+                    "no single administrator can clear a real deployment's "
+                    "witnessed ledger, and nothing here does."
+                ),
+            }
+        sentinel = scenario.dep.path("RESET_REQUESTED")
+        with open(sentinel, "w", encoding="utf-8") as fh:
+            fh.write("reset requested via /demo/admin/reset\n")
+        restart()
+        return {
+            "ok": True, "supervised": True, "rebuilding": True,
+            "note": (
+                "Rebuilding this demo sandbox from seed: new keys, fresh "
+                "witnesses, an empty ledger, the curated documents back. This "
+                "restarts the local demo instance. It is not an authority "
+                "capability -- no single administrator can clear a real "
+                "deployment's witnessed ledger."
+            ),
+        }
 
     # -- source ingestion: upload / compose / capacity ---------------------
     #

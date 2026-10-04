@@ -54,6 +54,12 @@ module.exports = {
       kill_timeout: 15000,
       autorestart: true,
       max_restarts: 10,
+      // Tells demo.py it may let the console's reset control stop the process
+      // and have it come back (fresh, via the RESET_REQUESTED sentinel).
+      // pm2 already injects pm_id; this names the capability explicitly so it
+      // survives a move to another supervisor. Never set it for an unmanaged
+      // foreground run -- nothing would restart the server.
+      env: { SAKSHYA_SUPERVISED: '1' },
     },
     {
       name: 'sakshya-ui',

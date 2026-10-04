@@ -25,9 +25,20 @@ Two steps. No venv, no config.
 It starts both halves and prints:
 
 - **Backend API** → http://127.0.0.1:8443
-- **Frontend / console** → http://127.0.0.1:5173
+- **Frontend / console** → http://127.0.0.1:7891
 
 Open the frontend link in your browser. Press **Ctrl-C** to stop both.
+
+**Start over from scratch** — new keys, empty ledger, no leftover state:
+
+```
+./run.sh --clean
+```
+
+That stops anything a previous run left behind, wipes the deployment directory
+(`/tmp/logfirst-demo`, or `$DATA` if you set one), clears the vite and pytest
+caches, and rebuilds the deployment from its seed. A plain `./run.sh` reuses
+the existing deployment on purpose, so the ledger survives a restart.
 
 ## If something's off
 

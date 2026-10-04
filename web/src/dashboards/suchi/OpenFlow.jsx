@@ -4,7 +4,6 @@ import { WitnessRing, FailClosed, PresentNotVerified, Caveat, ClassificationBann
 import { useAsync } from '../_shared/useAsync.jsx'
 import { Loading, ErrorState } from '../_shared/Async.jsx'
 import { Button, Panel, Pill, mono, shortHash } from '../_shared/ui.jsx'
-import { CertificateLauncher } from '../Pramanapatra.jsx'
 
 /**
  * The open surface (design plan §8.2). Opening is the one consequential act:
@@ -57,6 +56,11 @@ export default function OpenFlow({ me, doc }) {
   )
 }
 
+// Design plan §8.2 (line 348): the marked-copy reveal is an intentional, off-by
+// -default pitch affordance. Hidden from the toolbar for now — flip to true to
+// bring it back. `showMark`, `MarkedText` and `diff` stay wired for that.
+const SHOW_MARK_TOGGLE = false
+
 function Opened({ data, doc }) {
   const [showMark, setShowMark] = useState(false)
   const marked = data.marked_text || data.plaintext || ''
@@ -84,7 +88,7 @@ function Opened({ data, doc }) {
         <div style={{ display: 'flex', gap: 8, padding: '10px 14px', borderBottom: '1px solid var(--hairline)', alignItems: 'center' }} className="lb-noprint">
           <span style={{ ...mono, fontSize: 11, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>your copy · {kind}</span>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
-            {kind === 'text' ? (
+            {SHOW_MARK_TOGGLE && kind === 'text' ? (
               <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--ink-muted)', cursor: 'pointer' }}>
                 <input type="checkbox" checked={showMark} onChange={(e) => setShowMark(e.target.checked)} />
                 reveal the mark ({diff.length})
@@ -104,7 +108,6 @@ function Opened({ data, doc }) {
         <KV k="leaf hash" v={shortHash(entry.leaf_hash, 12, 8)} mono />
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 'var(--gap)' }}>
           <PresentNotVerified />
-          {entry.index != null ? <CertificateLauncher findingId={entry.index} /> : null}
         </div>
       </div>
 

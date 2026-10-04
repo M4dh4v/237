@@ -268,6 +268,18 @@ export const api = {
   reinstateRecipient: (recipientId) =>
     post('/demo/admin/reinstate', { recipient_id: recipientId }),
 
+  /**
+   * Reset the local demo sandbox: reseed the deployment from scratch (new keys,
+   * fresh witnesses, an empty ledger) by restarting the demo instance.
+   *
+   * This is deliberately NOT an authority capability and never a way to erase
+   * the witnessed ledger -- no single administrator can do that, and this route
+   * does not exist on a production-shaped run. Returns
+   * `{ ok, supervised, rebuilding, note, command? }`; when `rebuilding` is
+   * false the instance is unmanaged and must be restarted by hand.
+   */
+  resetDemo: () => post('/demo/admin/reset'),
+
   leakcheck: (payload) => post('/leakcheck', payload),
   example: (kind) => get(`/leakcheck/example/${kind}`),
 

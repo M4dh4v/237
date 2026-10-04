@@ -56,10 +56,19 @@ def _print_simulated() -> None:
 
 def serve(args) -> int:
     data_dir = os.path.abspath(args.data)
+    # A reset asked for from the console (POST /demo/admin/reset) leaves a
+    # one-shot sentinel behind, and this is the only place the scenario is
+    # built -- so honoring it here is what makes the restart that follows come
+    # back clean. The sentinel lives inside the data dir, so `fresh=True`
+    # removes it as it wipes: one reset, exactly one fresh rebuild.
+    sentinel = os.path.join(data_dir, "RESET_REQUESTED")
+    fresh = args.fresh or os.path.exists(sentinel)
     sc = Scenario.build(data_dir, n_docs=args.docs, target_words=args.words,
                         seed=args.seed, start_witnesses=True,
                         min_witnesses=args.witnesses,
-                        fresh=args.fresh)
+                        fresh=fresh)
+    if fresh and not args.fresh:
+        print("reset requested from the console: rebuilding from seed")
     _print_simulated()
     print(f"deployment: {data_dir}")
     print(f"witnesses:  {len(sc.dep.witness_ports)} processes on "
@@ -81,23 +90,39 @@ def serve(args) -> int:
     from logfirst.authority.server import build_app
 
     app = build_app(sc.authority, scenario=sc)
+
+    import uvicorn
+
+    ssl_kwargs = {}
+    if not args.no_tls:
+        from logfirst.crypto.mtls import MTLSFactory
+
+        factory = MTLSFactory.open(sc.dep.path("mtls"))
+        srv = factory.issue("authority", sc.dep.path("mtls"), server=True)
+        ssl_kwargs = dict(ssl_certfile=srv["cert"], ssl_keyfile=srv["key"],
+                          ssl_ca_certs=factory.ca_path, ssl_cert_reqs=2)
+
+    # An explicit Server (rather than uvicorn.run) so the sandbox-reset route
+    # has something to set `should_exit` on. A route that killed the process
+    # outright would skip the `finally` below and orphan the witness
+    # processes, leaving 9101+ held for the next start -- the exact failure
+    # run.sh's kill_stale and ecosystem.config.js's kill_timeout exist to
+    # clean up. `timeout_graceful_shutdown` bounds the wait so idle keep-alive
+    # connections cannot hold the restart past pm2's kill_timeout.
+    config = uvicorn.Config(app, host=args.host, port=args.port,
+                            log_level="warning",
+                            timeout_graceful_shutdown=5, **ssl_kwargs)
+    server = uvicorn.Server(config)
+
+    # The reset control can only work where something brings the process back.
+    # pm2 is this project's supervisor (ecosystem.config.js); a hand-run
+    # `--serve` has no one to restart it, so the route refuses instead of
+    # killing the console. Publishing the handle is how serve() decides.
+    if os.environ.get("pm_id") or os.environ.get("SAKSHYA_SUPERVISED"):
+        app.state.sakshya_restart = lambda: setattr(server, "should_exit", True)
+
     try:
-        if args.no_tls:
-            import uvicorn
-
-            uvicorn.run(app, host=args.host, port=args.port,
-                        log_level="warning")
-        else:
-            import uvicorn
-
-            from logfirst.crypto.mtls import MTLSFactory
-
-            factory = MTLSFactory.open(sc.dep.path("mtls"))
-            srv = factory.issue("authority", sc.dep.path("mtls"), server=True)
-            uvicorn.run(app, host=args.host, port=args.port,
-                        log_level="warning",
-                        ssl_certfile=srv["cert"], ssl_keyfile=srv["key"],
-                        ssl_ca_certs=factory.ca_path, ssl_cert_reqs=2)
+        server.run()
     except KeyboardInterrupt:
         pass
     finally:
